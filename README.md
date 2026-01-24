@@ -375,31 +375,6 @@ Find incident by ID
 - Vague messages without image context are classified as "discussion"
 - Check attachment extraction logs
 
-## Recent Improvements
-
-### v2.1 (Latest)
-- Migrated from Gemini to Groq for classification & prediction
-- Added AWS S3 + Textract for image attachment processing
-- Fixed resolution linking with semantic similarity
-- Added pagination for `/thala latest_issue`
-- Improved vague message handling
-- Better error handling for attachment failures
-- Strict incident creation rules (requires context)
-
-### v2.0
-- Slack bot UI with rich commands
-- Incident tracking system
-- Resolution detection & linking
-- Semantic search prioritization
-
-## Security
-
-- Never commit `.env` files
-- Rotate API keys regularly
-- Use AWS IAM roles with minimal permissions
-- Enable Elasticsearch authentication in production
-- Secure Kafka with SASL/SSL in production
-
 ## Credits
 
 - Built with Groq LLM for intelligent classification
