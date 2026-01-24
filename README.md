@@ -1,5 +1,4 @@
-# team-thala
-<img width="1024" height="1024" alt="image-Photoroom" src="https://github.com/user-attachments/assets/2b5bef99-dd5e-4744-997b-e9962d8e8c03" />
+# Agent Thala
 <img width="1024" height="1024" alt="image-Photoroom" src="Logo.png" />
 
 ![made-with-python](https://img.shields.io/badge/Made%20with-Python3-brightgreen)
@@ -15,6 +14,7 @@
     <br />
     </p>
 </p>
+
 <p align="center">
   <a href="#about-the-project">About The Project</a> •
   <a href="#architecture">Architecture</a> •
@@ -23,6 +23,16 @@
   <a href="#usage">Usage</a> •
   <a href="#api-endpoints">API Endpoints</a>
 </p>
+
+
+<br>
+<br>
+
+<h2>Ready to check the demo ?</h2>
+<br>
+
+[![Agnent Thala Prototype Launch](https://github.com/user-attachments/assets/3efb52f1-96f9-4f73-8e20-4643aafeb749)](https://youtu.be/jhLuYSsVMOA)
+
 
 
 ## About The Project
@@ -35,42 +45,8 @@ Thala is an intelligent incident management system that automatically:
 - Extracts text from image attachments using AWS Textract
 
 ## Architecture
+<img width="1912" height="1076" alt="architecture-thala" src="https://github.com/user-attachments/assets/b393e411-f913-4ba2-8bba-13848aca0f16" />
 
-```
-┌─────────────┐     ┌─────────────┐
-│   Slack     │     │    Jira     │
-│  Messages   │     │   Tickets   │
-└──────┬──────┘     └──────┬──────┘
-       │                   │
-       └───────────────────┘
-                  │
-           ┌───────▼────────┐
-           │     Kafka      │
-           │   (Message     │
-           │    Broker)     │
-           └───────┬────────┘
-                   │
-     ┌─────────────┴─────────────┐
-     │                           │
-┌────▼─────────┐         ┌───────▼──────────┐
-│ Slack/Jira   │         │   Flask API      │
-│ Connectors   │         │   (Backend)      │
-│ (Groq LLM)   │         │                  │
-└────┬─────────┘         └───────┬──────────┘
-     │                           │
-     │                           │
-┌────▼──────────┐      ┌─────────▼─────────┐
-│ AWS Textract  │      │  Elasticsearch    │
-│ (Image        │      │  (Vector Search)  │
-│  Extraction)  │      │  (Incident DB)    │
-│ + S3 Storage  │      │                   │
-└───────────────┘      └─────────┬─────────┘
-                                 │
-                        ┌────────▼──────────┐
-                        │   Slack Bot UI    │
-                        │  (/thala commands)│
-                        └───────────────────┘
-```
 
 ## Data Flow
 
@@ -83,6 +59,17 @@ Thala is an intelligent incident management system that automatically:
 7. **UI**: Slack bot commands (/thala latest_issue, /thala search)
 
 ## Key Features
+
+![clip7](https://github.com/user-attachments/assets/7aadff99-fc76-40ae-a629-e375f6ea6dfa)
+![clipp6](https://github.com/user-attachments/assets/d544533f-2d71-4035-83f8-859038369e0d)
+![clip4](https://github.com/user-attachments/assets/940ed5ef-5323-4604-bc83-c8cbcc14ef10)
+![clip3](https://github.com/user-attachments/assets/2b53d1a8-a589-41d6-b235-e2b139874a1e)
+![clipp2](https://github.com/user-attachments/assets/94c2489b-4c73-432d-8b4a-63298c82c171)
+![clip1](https://github.com/user-attachments/assets/890c69c5-8cf1-4727-aad1-c45382df2dd1)
+
+
+
+
 
 ### 1. Intelligent Classification
 - Uses Groq LLM (llama-3.3-70b) to classify messages semantically
