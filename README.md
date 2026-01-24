@@ -254,7 +254,7 @@ Slack: /thala search "database timeout"
 - Semantic search interface
 - Rich UI with Slack Block Kit
 
-### gemini_predictor.py (uses Groq)
+### gemini_predictor.py (uses Llama model from AWS Bedrock now)
 - Predicts category & severity
 - Uses few-shot learning with training examples
 - Caches predictions (24h TTL)
