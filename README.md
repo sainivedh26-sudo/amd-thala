@@ -2,9 +2,29 @@
 <img width="1024" height="1024" alt="image-Photoroom" src="https://github.com/user-attachments/assets/2b5bef99-dd5e-4744-997b-e9962d8e8c03" />
 <img width="1024" height="1024" alt="image-Photoroom" src="Logo.png" />
 
-# Thala - Incident Management System
+![made-with-python](https://img.shields.io/badge/Made%20with-Python3-brightgreen)
 
-## What is Thala?
+<!-- LOGO -->
+<br />
+<h1>
+<p align="center">
+  <br>Thala
+</h1>
+  <p align="center">
+    Intelligent incident management system for automated detection, classification, and resolution tracking.
+    <br />
+    </p>
+</p>
+<p align="center">
+  <a href="#about-the-project">About The Project</a> •
+  <a href="#architecture">Architecture</a> •
+  <a href="#key-features">Key Features</a> •
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#usage">Usage</a> •
+  <a href="#api-endpoints">API Endpoints</a>
+</p>
+
+## About The Project
 
 Thala is an intelligent incident management system that automatically:
 - Detects incidents from Slack messages, Jira tickets, and emails
@@ -14,6 +34,7 @@ Thala is an intelligent incident management system that automatically:
 - Extracts text from image attachments using AWS Textract
 
 ## Architecture
+
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │   Slack     │     │    Jira     │     │    Email    │
@@ -53,7 +74,7 @@ Thala is an intelligent incident management system that automatically:
 
 1. **Ingestion**: Slack/Jira/Email → Connectors → Kafka
 2. **Classification**: Groq LLM classifies messages (incident, resolution, discussion, unrelated)
-3. **Prediction**: Groq agent predicts category & severity (was Gemini, now Groq)
+3. **Prediction**: Groq agent predicts category & severity
 4. **Attachment Processing**: Images → S3 → Textract → Extracted text → Context
 5. **Storage**: Flask API → Elasticsearch (with embeddings for semantic search)
 6. **Resolution Tracking**: Links resolution messages to original incidents
@@ -89,10 +110,10 @@ Thala is an intelligent incident management system that automatically:
 - Returns similarity scores and resolution details
 
 ### 6. Slack Bot Commands
-- /thala latest_issue [page] - View ongoing incidents (paginated)
-- /thala search <query> - Search similar resolved incidents
-- /thala predict <description> - Predict category/severity
-- /thala - Show help
+- `/thala latest_issue [page]` - View ongoing incidents (paginated)
+- `/thala search <query>` - Search similar resolved incidents
+- `/thala predict <description>` - Predict category/severity
+- `/thala` - Show help
 
 ## Quick Start
 
@@ -102,14 +123,17 @@ Thala is an intelligent incident management system that automatically:
 - Kafka (KRaft mode, optional for real-time)
 - AWS Account (for S3 + Textract)
 
-### 1. Install Dependencies
+### Installation
+
+Install dependencies:
 ```bash
 pip install -r requirements.txt
 pip install -r team-thala/src/ui_requirements.txt
 ```
 
-### 2. Environment Setup
-Create .env file:
+### Environment Setup
+
+Create `.env` file in the root directory:
 ```ini
 # Groq (for classification & prediction)
 GROQ_API_KEY=your-groq-api-key
@@ -141,24 +165,28 @@ AWS_S3_BUCKET=thala-images
 ELASTICSEARCH_URL=http://localhost:9200
 ```
 
-### 3. Slack App Setup
+### Slack App Setup
+
 1. Create Slack app at https://api.slack.com/apps
 2. Add Bot Token Scopes:
-   - channels:history, channels:read
-   - chat:write, commands
-   - app_mentions:read, im:history
-   - **files:read** (REQUIRED for attachments)
+   - `channels:history`, `channels:read`
+   - `chat:write`, `commands`
+   - `app_mentions:read`, `im:history`
+   - `files:read` (REQUIRED for attachments)
 3. Install app to workspace
-4. Copy Bot Token (xoxb-...) to .env
+4. Copy Bot Token (xoxb-...) to `.env`
 
-**See**: team-thala/SLACK_FILES_READ_SETUP.md for details
+**See**: `team-thala/SLACK_FILES_READ_SETUP.md` for detailed setup instructions.
 
-### 4. Start Services
+## Usage
+
+### Start All Services (Integrated)
 ```bash
-# Start Flask API + Kafka Consumer
 python integrated_main.py
+```
 
-# OR start separately:
+### Start Services Separately
+```bash
 # Terminal 1: Flask API
 python new.py
 
@@ -172,39 +200,14 @@ python team-thala/src/slack_connector_enhanced.py
 python team-thala/src/slack_bot_ui.py
 ```
 
-## Key Components
+### Slack Commands
 
-### slack_connector_enhanced.py
-- Monitors Slack channels for messages
-- Classifies messages using Groq LLM
-- Processes attachments (S3 + Textract)
-- Detects resolutions and links to incidents
-- Prevents resolution messages from creating new incidents
-- Handles vague messages intelligently
-
-### slack_bot_ui.py
-- Slack bot with slash commands
-- Paginated incident listing
-- Semantic search interface
-- Rich UI with Slack Block Kit
-
-### gemini_predictor.py (uses Groq)
-- Predicts category & severity
-- Uses few-shot learning with training examples
-- Caches predictions (24h TTL)
-
-### aws_attachment_processor.py
-- Downloads attachments from Slack/Jira
-- Uploads to S3 bucket
-- Extracts text using Textract
-- Handles image format conversion (PNG → JPEG)
-
-### new.py (Flask API)
-- /index - Store incidents in Elasticsearch
-- /search - Semantic similarity search
-- /predict_incident - Predict likelihood
-- /update_status - Mark incidents as resolved
-- /lookup_incident - Find incident by ID
+```sh
+/thala                          # Show help and available commands
+/thala latest_issue [page]      # View ongoing incidents (paginated, 10 per page)
+/thala search <query>           # Search similar resolved incidents
+/thala predict <description>    # Predict incident category and severity
+```
 
 ## How It Works
 
@@ -248,68 +251,39 @@ Slack: /thala search "database timeout"
   → Displays in Slack with rich formatting
 ```
 
-## Important Notes
+## Key Components
 
-### Token Types
-- **Bot Token** (xoxb-...): Required for Web API calls (files_info, channels, etc.)
-- **App Token** (xapp-...): Only for Socket Mode (not used currently)
-- **Use Bot Token** in SLACK_BOT_TOKEN environment variable
+### slack_connector_enhanced.py
+- Monitors Slack channels for messages
+- Classifies messages using Groq LLM
+- Processes attachments (S3 + Textract)
+- Detects resolutions and links to incidents
+- Prevents resolution messages from creating new incidents
+- Handles vague messages intelligently
 
-### LLM Providers
-- **Classification**: Groq (llama-3.3-70b-versatile)
-- **Prediction**: Groq (was Gemini, migrated)
-- **Search**: Sentence Transformers (local embeddings)
+### slack_bot_ui.py
+- Slack bot with slash commands
+- Paginated incident listing
+- Semantic search interface
+- Rich UI with Slack Block Kit
 
-### Attachment Requirements
-- Slack app must have files:read scope
-- AWS credentials must be configured
-- S3 bucket must exist (thala-images)
-- Textract must be enabled in AWS region
+### gemini_predictor.py (uses Groq)
+- Predicts category & severity
+- Uses few-shot learning with training examples
+- Caches predictions (24h TTL)
 
-### Resolution Detection
-- No keyword matching - pure semantic understanding
-- Links resolutions even if ID not mentioned explicitly
-- Uses conversational context (recent incidents)
-- Fallback to most recent open incident if no match
+### aws_attachment_processor.py
+- Downloads attachments from Slack/Jira
+- Uploads to S3 bucket
+- Extracts text using Textract
+- Handles image format conversion (PNG → JPEG)
 
-## Common Issues
-
-### "Missing scope: files:read"
-- Add files:read scope in Slack app settings
-- Reinstall app to workspace
-- See: team-thala/SLACK_FILES_READ_SETUP.md
-
-### "Cannot identify image file"
-- Image format issue (converted to JPEG automatically)
-- Slack bot may not have proper file download permissions
-- Check S3 upload succeeded before Textract
-
-### "Resolution not linking"
-- Check logs for similarity scores (should be > 0.3)
-- Verify incident exists in Elasticsearch
-- Ensure incident is still "Open" status
-
-### "Vague messages creating incidents"
-- System now requires technical details OR successful image extraction
-- Vague messages without image context are classified as "discussion"
-- Check attachment extraction logs
-
-## Recent Improvements
-
-### v2.1 (Latest)
-- Migrated from Gemini to Groq for classification & prediction
-- Added AWS S3 + Textract for image attachment processing
-- Fixed resolution linking with semantic similarity
-- Added pagination for /thala latest_issue
-- Improved vague message handling
-- Better error handling for attachment failures
-- Strict incident creation rules (requires context)
-
-### v2.0
-- Slack bot UI with rich commands
-- Incident tracking system
-- Resolution detection & linking
-- Semantic search prioritization
+### new.py (Flask API)
+- `/index` - Store incidents in Elasticsearch
+- `/search` - Semantic similarity search
+- `/predict_incident` - Predict likelihood
+- `/update_status` - Mark incidents as resolved
+- `/lookup_incident` - Find incident by ID
 
 ## API Endpoints
 
@@ -354,3 +328,81 @@ Find incident by ID
   "issue_id": "slack_1234567890"
 }
 ```
+
+## Important Notes
+
+### Token Types
+- **Bot Token** (xoxb-...): Required for Web API calls (files_info, channels, etc.)
+- **App Token** (xapp-...): Only for Socket Mode (not used currently)
+- **Use Bot Token** in SLACK_BOT_TOKEN environment variable
+
+### LLM Providers
+- **Classification**: Groq (llama-3.3-70b-versatile)
+- **Prediction**: Groq (was Gemini, migrated)
+- **Search**: Sentence Transformers (local embeddings)
+
+### Attachment Requirements
+- Slack app must have `files:read` scope
+- AWS credentials must be configured
+- S3 bucket must exist (thala-images)
+- Textract must be enabled in AWS region
+
+### Resolution Detection
+- No keyword matching - pure semantic understanding
+- Links resolutions even if ID not mentioned explicitly
+- Uses conversational context (recent incidents)
+- Fallback to most recent open incident if no match
+
+## Common Issues
+
+### "Missing scope: files:read"
+- Add `files:read` scope in Slack app settings
+- Reinstall app to workspace
+- See: `team-thala/SLACK_FILES_READ_SETUP.md`
+
+### "Cannot identify image file"
+- Image format issue (converted to JPEG automatically)
+- Slack bot may not have proper file download permissions
+- Check S3 upload succeeded before Textract
+
+### "Resolution not linking"
+- Check logs for similarity scores (should be > 0.3)
+- Verify incident exists in Elasticsearch
+- Ensure incident is still "Open" status
+
+### "Vague messages creating incidents"
+- System now requires technical details OR successful image extraction
+- Vague messages without image context are classified as "discussion"
+- Check attachment extraction logs
+
+## Recent Improvements
+
+### v2.1 (Latest)
+- Migrated from Gemini to Groq for classification & prediction
+- Added AWS S3 + Textract for image attachment processing
+- Fixed resolution linking with semantic similarity
+- Added pagination for `/thala latest_issue`
+- Improved vague message handling
+- Better error handling for attachment failures
+- Strict incident creation rules (requires context)
+
+### v2.0
+- Slack bot UI with rich commands
+- Incident tracking system
+- Resolution detection & linking
+- Semantic search prioritization
+
+## Security
+
+- Never commit `.env` files
+- Rotate API keys regularly
+- Use AWS IAM roles with minimal permissions
+- Enable Elasticsearch authentication in production
+- Secure Kafka with SASL/SSL in production
+
+## Credits
+
+- Built with Groq LLM for intelligent classification
+- AWS Textract for image text extraction
+- Elasticsearch for semantic search
+- Kafka for real-time event streaming
