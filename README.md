@@ -340,9 +340,8 @@ Find incident by ID
 - Uses conversational context (recent incidents)
 - Fallback to most recent open incident if no match
 
-## Credits
+## Developers
 
-- Built with Groq LLM for intelligent classification
-- AWS Textract for image text extraction
-- Elasticsearch for semantic search
-- Kafka for real-time event streaming
+[Sai Nivedh](https://www.github.com/SaiNivedh26)
+
+[Kishore Balaji](https://www.github.com/Kishore-1803)
