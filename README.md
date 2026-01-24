@@ -37,38 +37,39 @@ Thala is an intelligent incident management system that automatically:
 ## Architecture
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Slack     │     │    Jira     │     │    Email    │
-│  Messages   │     │   Tickets   │     │  Messages   │
-└──────┬──────┘     └──────┬──────┘     └──────┬──────┘
-       │                   │                   │
-       └───────────────────┴───────────────────┘
-                           │
-                    ┌───────▼────────┐
-                    │     Kafka      │
-                    │   (Message     │
-                    │    Broker)     │
-                    └───────┬────────┘
-                            │
-              ┌─────────────┴─────────────┐
-              │                           │
-       ┌──────▼────────┐         ┌───────▼──────────┐
-       │ Slack/Jira    │         │   Flask API       │
-       │ Connectors    │         │   (Backend)       │
-       │ (Groq LLM)    │         │                   │
-       └──────┬────────┘         └───────┬──────────┘
-              │                           │
-              │                           │
-    ┌─────────▼──────────┐      ┌────────▼──────────┐
-    │ AWS Textract       │      │  Elasticsearch     │
-    │ (Image Extraction) │      │  (Vector Search)   │
-    │ + S3 Storage       │      │  (Incident DB)     │
-    └────────────────────┘      └───────────────────┘
-                                         │
-                                ┌────────▼──────────┐
-                                │   Slack Bot UI     │
-                                │   (/thala commands)│
-                                └────────────────────┘
+┌─────────────┐     ┌─────────────┐
+│   Slack     │     │    Jira     │
+│  Messages   │     │   Tickets   │
+└──────┬──────┘     └──────┬──────┘
+       │                   │
+       └───────────────────┘
+                  │
+           ┌───────▼────────┐
+           │     Kafka      │
+           │   (Message     │
+           │    Broker)     │
+           └───────┬────────┘
+                   │
+     ┌─────────────┴─────────────┐
+     │                           │
+┌────▼─────────┐         ┌───────▼──────────┐
+│ Slack/Jira   │         │   Flask API       │
+│ Connectors   │         │   (Backend)       │
+│ (Groq LLM)   │         │                   │
+└────┬─────────┘         └───────┬──────────┘
+     │                           │
+     │                           │
+┌────▼──────────┐      ┌─────────▼─────────┐
+│ AWS Textract  │      │  Elasticsearch    │
+│ (Image        │      │  (Vector Search)  │
+│  Extraction)  │      │  (Incident DB)    │
+│ + S3 Storage  │      │                   │
+└───────────────┘      └─────────┬─────────┘
+                                 │
+                        ┌────────▼──────────┐
+                        │   Slack Bot UI    │
+                        │  (/thala commands)│
+                        └───────────────────┘
 ```
 
 ## Data Flow
