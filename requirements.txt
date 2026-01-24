@@ -12,3 +12,6 @@ jira
 slack-sdk
 kafka-python-ng
 google-genai
+groq
+boto3
+Pillow

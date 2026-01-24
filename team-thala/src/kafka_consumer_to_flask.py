@@ -2,16 +2,26 @@
 Kafka Consumer that reads messages from Kafka topics and sends them to Flask API
 This bridges the Kafka queue with the ML prediction system
 """
+import sys
+import os
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import json
 import logging
-import os
 import requests
 from kafka import KafkaConsumer
 from dotenv import load_dotenv
 import time
 from datetime import datetime
+from incident_tracker import get_tracker
+from gemini_predictor import get_predictor
 
 load_dotenv()
+
+# Get tracker and predictor instances
+tracker = get_tracker()
+predictor = None  # Will be initialized only if needed
 
 class KafkaToFlaskBridge:
     """Consumes messages from Kafka and sends them to Flask API"""
@@ -27,6 +37,17 @@ class KafkaToFlaskBridge:
         self.logger = logging.getLogger(__name__)
         self.consumer = None
         self.running = True
+        self.enable_prediction = os.getenv('ENABLE_CATEGORY_PREDICTION', 'true').lower() == 'true'
+        
+        # Initialize predictor if enabled
+        if self.enable_prediction:
+            try:
+                global predictor
+                predictor = get_predictor()
+                self.logger.info("Category/Severity prediction enabled")
+            except Exception as e:
+                self.logger.warning(f"Could not initialize predictor: {e}. Predictions disabled.")
+                self.enable_prediction = False
         
     def connect(self):
         """Connect to Kafka consumer"""
@@ -54,6 +75,29 @@ class KafkaToFlaskBridge:
             if message.get('type') == 'status_update' and message.get('action') == 'mark_resolved':
                 return self._format_status_update(message)
             
+            # Handle discussion messages - add to tracker AND send to Flask
+            if message.get('type') == 'context_update' or message.get('message_type') == 'discussion':
+                linked_issue_id = message.get('linked_issue_id')
+                if linked_issue_id:
+                    # Add to in-memory tracker
+                    tracker.add_discussion(
+                        linked_issue_id,
+                        message.get('text', ''),
+                        message.get('user_id')
+                    )
+                    self.logger.info(f"[DISCUSSION] Added to tracker: {linked_issue_id}")
+                    
+                    # Also send to Flask to store in Elasticsearch
+                    # Format as a discussion update
+                    return {
+                        'type': 'discussion',
+                        'linked_issue_id': linked_issue_id,
+                        'text': message.get('text', ''),
+                        'user_id': message.get('user_id'),
+                        'timestamp': message.get('timestamp', datetime.utcnow().isoformat())
+                    }
+                return None  # No linked issue, skip
+            
             # Debug: Log received message
             if message.get('incident_likelihood'):
                 self.logger.info(f"Received auto-labeled message: {message.get('id', 'unknown')} -> {message.get('incident_likelihood')}")
@@ -75,11 +119,47 @@ class KafkaToFlaskBridge:
             if not timestamp:
                 timestamp = datetime.utcnow().isoformat()
             
-            # Get status
-            status = message.get('status', 'Open')
+            # Get status and normalize for Jira
+            raw_status = message.get('status', 'Open')
+            status = self._normalize_status(raw_status, source)
             
             # Get incident_likelihood (for auto-labeled resolutions)
             incident_likelihood = message.get('incident_likelihood')
+            
+            # Get category and severity (either from message or predict)
+            category = message.get('category')
+            severity = message.get('severity')
+            
+            # If not provided, predict using Gemini
+            if not category or not severity:
+                if self.enable_prediction and status == 'Open' and predictor:
+                    try:
+                        prediction = predictor.predict(text)
+                        category = prediction['category']
+                        severity = prediction['severity']
+                        self.logger.info(f"[PREDICT] {message.get('id')}: {category}/{severity}")
+                    except Exception as e:
+                        self.logger.error(f"Prediction error: {e}")
+            else:
+                self.logger.info(f"[ALREADY CLASSIFIED] {message.get('id')}: {category}/{severity}")
+            
+            # Add to incident tracker
+            if status == 'Open':
+                tracker.add_incident({
+                    'id': message.get('id'),
+                    'text': text,
+                    'source': source,
+                    'timestamp': timestamp,
+                    'status': status,
+                    'category': category,
+                    'severity': severity,
+                    'user_id': message.get('user_id'),
+                    'channel_id': message.get('channel_id')
+                })
+                
+                # Debug: Verify it was added
+                stats = tracker.get_stats()
+                self.logger.info(f"[TRACKER DEBUG] Stats after add: {stats}")
             
             # Prepare payload for Flask
             payload = {
@@ -94,6 +174,12 @@ class KafkaToFlaskBridge:
             if incident_likelihood:
                 payload["incident_likelihood"] = incident_likelihood
             
+            # Add category and severity if predicted
+            if category:
+                payload["category"] = category
+            if severity:
+                payload["severity"] = severity
+            
             return payload
             
         except Exception as e:
@@ -102,6 +188,15 @@ class KafkaToFlaskBridge:
     
     def _format_status_update(self, message):
         """Format status update message"""
+        # Update tracker
+        issue_id = message.get('original_issue_id')
+        if issue_id:
+            tracker.update_incident_status(
+                issue_id,
+                message.get('status'),
+                message.get('resolution_text')
+            )
+        
         return {
             "action": "update_status",
             "original_issue_id": message.get('original_issue_id'),
@@ -111,6 +206,28 @@ class KafkaToFlaskBridge:
             "resolved_at": message.get('resolved_at'),
             "timestamp": message.get('timestamp')
         }
+    
+    def _normalize_status(self, raw_status, source):
+        """Normalize status from different sources to Open/Resolved"""
+        if not raw_status:
+            return 'Open'
+        
+        status_lower = raw_status.lower().strip()
+        
+        # Jira statuses
+        if source == 'jira':
+            # Resolved statuses
+            resolved_statuses = ['done', 'resolved', 'closed', 'cancelled']
+            if any(resolved in status_lower for resolved in resolved_statuses):
+                return 'Resolved'
+            # All other statuses (To Do, In Progress, In Review, etc.) are Open
+            return 'Open'
+        
+        # Slack/Email: use as-is or default to Open
+        if status_lower in ['resolved', 'closed', 'done']:
+            return 'Resolved'
+        
+        return 'Open'
     
     def _format_text(self, message, source):
         """Format message text based on source"""
@@ -140,6 +257,18 @@ class KafkaToFlaskBridge:
     def send_to_flask(self, payload):
         """Send formatted payload to Flask API"""
         try:
+            # Check if this is a discussion update
+            if payload.get('type') == 'discussion':
+                endpoint = f"{self.flask_url}/add_discussion"
+                response = requests.post(endpoint, json=payload, timeout=10)
+                
+                if response.status_code == 200:
+                    self.logger.info(f"[OK] Discussion added to {payload.get('linked_issue_id')}")
+                    return True
+                else:
+                    self.logger.error(f"Flask API error on discussion: {response.status_code} - {response.text}")
+                    return False
+            
             # Check if this is a status update
             if payload.get('action') == 'update_status':
                 endpoint = f"{self.flask_url}/update_status"

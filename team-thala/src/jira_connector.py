@@ -1,12 +1,20 @@
 import logging
 from jira import JIRA
 import os
+import tempfile
 from kafka_producer import KafkaMessageProducer
 from dotenv import load_dotenv
 import time
 from datetime import datetime, timedelta
 
 load_dotenv()
+
+# Optional: AWS attachment processor
+try:
+    from aws_attachment_processor import get_attachment_processor
+    ATTACHMENT_PROCESSOR_AVAILABLE = True
+except ImportError:
+    ATTACHMENT_PROCESSOR_AVAILABLE = False
 
 # Optional: Gemini LLM for intelligent classification
 try:
@@ -49,7 +57,100 @@ class JiraConnector:
             else:
                 self.logger.warning("GEMINI_API_KEY not found, using rule-based labeling only")
                 self.use_gemini = False
+        
+        # Initialize AWS attachment processor (optional)
+        self.attachment_processor = None
+        if ATTACHMENT_PROCESSOR_AVAILABLE:
+            try:
+                self.attachment_processor = get_attachment_processor()
+                self.logger.info("AWS attachment processor initialized for Jira")
+            except Exception as e:
+                self.logger.warning(f"AWS attachment processor not available: {e}")
 
+    def process_jira_attachments(self, issue):
+        """
+        Process attachments from Jira issue
+        Downloads files, uploads to S3, extracts text, and returns extracted text
+        
+        Args:
+            issue: Jira issue object
+            
+        Returns:
+            str: Combined extracted text from all attachments (or None)
+        """
+        if not self.attachment_processor:
+            return None
+        
+        try:
+            attachments = issue.fields.attachment if hasattr(issue.fields, 'attachment') and issue.fields.attachment else []
+            if not attachments:
+                return None
+            
+            extracted_texts = []
+            attachment_urls = []
+            
+            for attachment in attachments:
+                try:
+                    filename = attachment.filename
+                    file_size = attachment.size
+                    file_id = attachment.id
+                    
+                    # Skip if file is too large (max 10MB for Textract)
+                    if file_size > 10 * 1024 * 1024:
+                        self.logger.warning(f"[ATTACHMENT] Skipping large file {filename} ({file_size} bytes)")
+                        continue
+                    
+                    self.logger.info(f"[ATTACHMENT] Processing Jira attachment {filename} (type: {attachment.mimeType})")
+                    
+                    # Download attachment from Jira to temp file
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(filename)[1]) as temp_file:
+                        attachment_path = temp_file.name
+                        attachment.get(attachment_path)
+                    
+                    # Process attachment: upload to S3 → Textract
+                    result = self.attachment_processor.process_attachment(
+                        file_url_or_path=attachment_path,
+                        source='jira',
+                        file_id=file_id,
+                        filename=filename,
+                        download=False  # Already have local file
+                    )
+                    
+                    # Clean up temp file
+                    try:
+                        os.unlink(attachment_path)
+                    except:
+                        pass
+                    
+                    if result.get('success'):
+                        s3_url = result.get('s3_url')
+                        extracted_text = result.get('extracted_text')
+                        
+                        if s3_url:
+                            attachment_urls.append(s3_url)
+                            self.logger.info(f"[ATTACHMENT] ✅ Uploaded to S3: {s3_url}")
+                        
+                        if extracted_text:
+                            extracted_texts.append(f"[Attachment: {filename}]\n{extracted_text}")
+                            self.logger.info(f"[ATTACHMENT] ✅ Extracted {len(extracted_text)} chars from {filename}")
+                    else:
+                        self.logger.warning(f"[ATTACHMENT] ❌ Failed to process {filename}")
+                        
+                except Exception as e:
+                    self.logger.error(f"Error processing Jira attachment: {e}")
+                    continue
+            
+            # Combine all extracted text
+            if extracted_texts:
+                combined_text = "\n\n".join(extracted_texts)
+                return combined_text
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error processing Jira attachments: {e}")
+            return None
+    
     def fetch_new_issues(self, jql='project = KAN ORDER BY created DESC', max_results=10):
         """Fetch NEW issues that haven't been processed yet"""
         issues = self.jira.search_issues(jql, maxResults=max_results)
@@ -58,10 +159,18 @@ class JiraConnector:
             if issue.key in self.processed_issues:
                 continue
             
+            # Process attachments if any
+            description = issue.fields.description or ""
+            attachment_text = self.process_jira_attachments(issue)
+            if attachment_text:
+                # Append extracted text to description
+                description = f"{description}\n\n{attachment_text}" if description else attachment_text
+                self.logger.info(f"[ATTACHMENT] Added {len(attachment_text)} chars from attachments to issue {issue.key}")
+            
             data = {
                 "id": issue.key,
                 "summary": issue.fields.summary,
-                "description": issue.fields.description or "",
+                "description": description,  # Now includes extracted text from attachments
                 "status": issue.fields.status.name,
                 "created": issue.fields.created,
                 "reporter": issue.fields.reporter.displayName if issue.fields.reporter else "Unknown",
@@ -91,7 +200,7 @@ class JiraConnector:
                     self.logger.warning(f"Failed to sync Jira issue to Slack context: {e}")
     
     def monitor_issue_updates(self):
-        """Monitor existing issues for status changes and resolutions"""
+        """Monitor existing issues for status changes, resolutions, and deletions"""
         if not self.monitored_issues:
             return
         
@@ -102,37 +211,89 @@ class JiraConnector:
                 issue_keys = issue_keys[-50:]  # Limit to last 50 issues
             
             jql = f"key in ({','.join(issue_keys)}) ORDER BY updated DESC"
-            issues = self.jira.search_issues(jql, maxResults=50)
             
-            for issue in issues:
-                current_status = issue.fields.status.name
-                previous_info = self.monitored_issues.get(issue.key)
-                
-                if not previous_info:
-                    continue
-                
-                previous_status = previous_info['status']
-                
-                # Check if status changed to resolved/done
-                if previous_status != current_status and current_status in ['Done', 'Resolved', 'Closed']:
-                    self.logger.info(f"Issue {issue.key} status changed: {previous_status} → {current_status}")
-                    self.handle_resolution(issue, previous_info)
+            try:
+                issues = self.jira.search_issues(jql, maxResults=50)
+                found_keys = {issue.key for issue in issues}
+            except Exception as search_error:
+                self.logger.warning(f"Error searching issues: {search_error}")
+                # If search fails, try checking individual issues
+                found_keys = set()
+                for key in issue_keys[:10]:  # Limit to 10 for performance
+                    try:
+                        issue = self.jira.issue(key)
+                        found_keys.add(key)
+                    except Exception as e:
+                        # Issue not found (likely deleted)
+                        error_str = str(e).lower()
+                        if 'not found' in error_str or 'does not exist' in error_str or '404' in error_str:
+                            self.logger.info(f"🔍 Issue {key} not found in Jira (deleted)")
+                        found_keys.discard(key)
+            
+            # Check for deleted issues (in monitored_issues but not found in search)
+            deleted_keys = set(issue_keys) - found_keys
+            for deleted_key in deleted_keys:
+                if deleted_key in self.monitored_issues:
+                    self.logger.info(f"🔍 Issue {deleted_key} not found in Jira - likely deleted")
+                    self.handle_deletion(deleted_key)
+                    # Remove from monitored issues
+                    del self.monitored_issues[deleted_key]
+            
+            # Process found issues
+            if 'issues' in locals():
+                for issue in issues:
+                    current_status = issue.fields.status.name
+                    previous_info = self.monitored_issues.get(issue.key)
                     
-                    # Sync resolution to Slack context queue
-                    if self.slack_connector:
-                        try:
-                            self.slack_connector.sync_jira_resolution(issue.key)
-                        except Exception as e:
-                            self.logger.warning(f"Failed to sync Jira resolution to Slack context: {e}")
+                    if not previous_info:
+                        continue
                     
-                # Update monitored status
-                self.monitored_issues[issue.key]['status'] = current_status
+                    previous_status = previous_info['status']
+                    
+                    # Check if status changed to resolved/done
+                    if previous_status != current_status and current_status in ['Done', 'Resolved', 'Closed']:
+                        self.logger.info(f"Issue {issue.key} status changed: {previous_status} → {current_status}")
+                        self.handle_resolution(issue, previous_info)
+                        
+                        # Sync resolution to Slack context queue
+                        if self.slack_connector:
+                            try:
+                                self.slack_connector.sync_jira_resolution(issue.key)
+                            except Exception as e:
+                                self.logger.warning(f"Failed to sync Jira resolution to Slack context: {e}")
+                        
+                    # Update monitored status
+                    self.monitored_issues[issue.key]['status'] = current_status
                 
         except Exception as e:
             self.logger.error(f"Error monitoring issue updates: {e}")
     
+    def handle_deletion(self, issue_key):
+        """Handle when an issue is deleted from Jira - mark as Resolved in Elasticsearch"""
+        try:
+            self.logger.info(f"[DELETION] Marking {issue_key} as Resolved (deleted from Jira)")
+            
+            # Send status update message to mark as resolved
+            status_update = {
+                "id": f"{issue_key}_deleted",
+                "type": "status_update",
+                "action": "mark_resolved",
+                "original_issue_id": issue_key,
+                "status": "Resolved",
+                "resolution_text": "Issue deleted from Jira",
+                "resolved_by": "System (Jira Deletion)",
+                "resolved_at": datetime.utcnow().isoformat(),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+            self.kafka_producer.send_message(self.topic, status_update, key=f"delete_{issue_key}")
+            self.logger.info(f"[DELETION] ✅ Sent deletion update for {issue_key} to Kafka")
+            
+        except Exception as e:
+            self.logger.error(f"Error handling deletion for {issue_key}: {e}")
+    
     def handle_resolution(self, issue, previous_info):
-        """Handle when an issue is resolved - extract resolution and auto-label"""
+        """Handle when an issue is resolved - send status update instead of creating new entry"""
         try:
             # Extract resolution comments
             resolution_text = self.extract_resolution_comments(issue)
@@ -150,48 +311,122 @@ class JiraConnector:
                 resolution_text
             )
             
-            # Format resolution message
-            resolution_data = {
-                "id": f"{issue.key}_resolution",
-                "original_issue_key": issue.key,
-                "summary": issue.fields.summary,
-                "description": issue.fields.description or "",
-                "resolution_comments": resolution_text,
+            # Send status update message instead of creating new entry
+            status_update = {
+                "id": f"{issue.key}_status_update",
+                "type": "status_update",
+                "action": "mark_resolved",
+                "original_issue_id": issue.key,  # This is the key - use original issue ID
                 "status": issue.fields.status.name,
-                "created": previous_info['created'],
-                "resolved": issue.fields.updated,
+                "resolution_text": resolution_text,
+                "resolved_by": issue.fields.assignee.displayName if issue.fields.assignee else "Unknown",
+                "resolved_at": issue.fields.updated,
+                "incident_likelihood": incident_likelihood,
                 "resolution_time_hours": round(resolution_duration, 2),
-                "reporter": issue.fields.reporter.displayName if issue.fields.reporter else "Unknown",
-                "assignee": issue.fields.assignee.displayName if issue.fields.assignee else "Unknown",
-                "priority": previous_info['priority'],
-                "issue_type": previous_info['issue_type'],
-                "labels": previous_info['labels'],
-                "timestamp": issue.fields.updated,
-                "incident_likelihood": incident_likelihood  # Auto-labeled!
+                "timestamp": issue.fields.updated
             }
             
             self.logger.info(f"[RESOLUTION] {issue.key} auto-labeled as '{incident_likelihood}' (resolved in {resolution_duration:.1f}h)")
-            self.kafka_producer.send_message(self.topic, resolution_data, key=f"{issue.key}_resolution")
+            self.kafka_producer.send_message(self.topic, status_update, key=f"update_{issue.key}")
             
         except Exception as e:
             self.logger.error(f"Error handling resolution for {issue.key}: {e}")
     
     def extract_resolution_comments(self, issue):
-        """Extract resolution description from comments"""
+        """Extract resolution description from comments (including attachment text)"""
         try:
             comments = self.jira.comments(issue.key)
-            if not comments:
+            comment_texts = []
+            
+            # Process each comment for attachments
+            for comment in comments:
+                comment_body = comment.body
+                
+                # Check if comment has attachments and process them
+                if hasattr(comment, 'attachments') and comment.attachments:
+                    attachment_text = self.process_jira_comment_attachments(comment)
+                    if attachment_text:
+                        comment_body = f"{comment_body}\n\n{attachment_text}" if comment_body else attachment_text
+                
+                comment_texts.append(comment_body)
+            
+            if not comment_texts:
                 return issue.fields.description or "No resolution comments"
             
             # Get the last few comments (usually contain resolution info)
-            recent_comments = comments[-3:] if len(comments) >= 3 else comments
-            resolution_text = " | ".join([comment.body for comment in recent_comments])
+            recent_comments = comment_texts[-3:] if len(comment_texts) >= 3 else comment_texts
+            resolution_text = " | ".join(recent_comments)
             
             return resolution_text[:500]  # Limit length
             
         except Exception as e:
             self.logger.warning(f"Could not extract comments for {issue.key}: {e}")
             return issue.fields.description or "Resolution details unavailable"
+    
+    def process_jira_comment_attachments(self, comment):
+        """
+        Process attachments from Jira comment
+        
+        Args:
+            comment: Jira comment object
+            
+        Returns:
+            str: Combined extracted text from comment attachments (or None)
+        """
+        if not self.attachment_processor or not hasattr(comment, 'attachments'):
+            return None
+        
+        try:
+            attachments = comment.attachments
+            if not attachments:
+                return None
+            
+            extracted_texts = []
+            
+            for attachment in attachments:
+                try:
+                    filename = attachment.filename
+                    file_size = attachment.size
+                    file_id = attachment.id
+                    
+                    if file_size > 10 * 1024 * 1024:
+                        continue
+                    
+                    # Download attachment to temp file
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(filename)[1]) as temp_file:
+                        attachment_path = temp_file.name
+                        attachment.get(attachment_path)
+                    
+                    # Process attachment
+                    result = self.attachment_processor.process_attachment(
+                        file_url_or_path=attachment_path,
+                        source='jira',
+                        file_id=file_id,
+                        filename=filename,
+                        download=False
+                    )
+                    
+                    # Clean up
+                    try:
+                        os.unlink(attachment_path)
+                    except:
+                        pass
+                    
+                    if result.get('success') and result.get('extracted_text'):
+                        extracted_texts.append(f"[Comment Attachment: {filename}]\n{result['extracted_text']}")
+                        
+                except Exception as e:
+                    self.logger.error(f"Error processing comment attachment: {e}")
+                    continue
+            
+            if extracted_texts:
+                return "\n\n".join(extracted_texts)
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error processing Jira comment attachments: {e}")
+            return None
     
     def determine_incident_likelihood(self, issue, previous_info, resolution_time_hours, resolution_text):
         """Auto-determine if this was a real incident using rules + optional LLM"""
@@ -303,3 +538,50 @@ Respond with ONLY one word: "Likely" or "Not Likely"
     def close(self):
         """Close Jira connector"""
         self.kafka_producer.close()
+
+
+if __name__ == "__main__":
+    import logging
+    
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Create and start Jira connector
+        logger.info("=" * 60)
+        logger.info("Starting Jira Connector")
+        logger.info("=" * 60)
+        logger.info("Features:")
+        logger.info("  ✓ Monitor new Jira issues")
+        logger.info("  ✓ Track issue status changes")
+        logger.info("  ✓ Automatic resolution detection")
+        logger.info("  ✓ Attachment processing (S3 + Textract)")
+        logger.info("  ✓ Image text extraction for incident context")
+        logger.info("=" * 60)
+        
+        connector = JiraConnector()
+        
+        # Use 15 second interval (checks for new issues every 15 seconds)
+        # Change to 60 for production
+        logger.info("Starting Jira monitoring (interval: 15 seconds)...")
+        logger.info("Monitoring for:")
+        logger.info("  - New Jira issues (automatically creates incidents)")
+        logger.info("  - Issue status changes (tracks resolutions)")
+        logger.info("  - Attachments (uploads to S3, extracts text)")
+        logger.info("")
+        logger.info("Press Ctrl+C to stop")
+        logger.info("=" * 60)
+        
+        connector.start_monitoring(interval=15)
+    except KeyboardInterrupt:
+        logger.info("Shutting down Jira Connector...")
+        connector.close()
+    except Exception as e:
+        logger.error(f"Fatal error: {e}")
+        import traceback
+        traceback.print_exc()

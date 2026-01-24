@@ -257,7 +257,7 @@ def index():
 
 @app.route('/update_status', methods=['POST'])
 def update_status():
-    """Update status of an existing document in Elasticsearch"""
+    """Update status of an existing document in Elasticsearch by issue_id or document _id"""
     try:
         data = request.get_json()
         original_issue_id = data.get('original_issue_id')
@@ -266,6 +266,42 @@ def update_status():
         
         if not original_issue_id:
             return jsonify({"error": "No original_issue_id provided"}), 400
+        
+        updated_count = 0
+        
+        # First, try to update by document _id (in case user referenced document ID)
+        try:
+            doc = es.get(index="thala_knowledge", id=original_issue_id)
+            doc_id = original_issue_id
+            update_body = {
+                "doc": {
+                    "status": status
+                }
+            }
+            
+            # Add resolution metadata if provided
+            if resolution_text:
+                update_body["doc"]["resolution_text"] = resolution_text
+            
+            # Add resolved_by and resolved_at from request
+            if data.get('resolved_by'):
+                update_body["doc"]["resolved_by"] = data.get('resolved_by')
+            if data.get('resolved_at'):
+                update_body["doc"]["resolved_at"] = data.get('resolved_at')
+            
+            es.update(index="thala_knowledge", id=doc_id, body=update_body)
+            updated_count += 1
+            logger.info(f"Updated document {doc_id} (by _id) status to {status} (resolved by: {data.get('resolved_by', 'unknown')})")
+            
+            return jsonify({
+                "message": f"Updated {updated_count} document(s)",
+                "original_issue_id": original_issue_id,
+                "new_status": status
+            })
+        except Exception as doc_error:
+            # Document not found by _id, try searching by issue_id field
+            logger.debug(f"Not found by document _id, trying issue_id field: {doc_error}")
+            pass
         
         # Search for the original document by issue_id field (exact match)
         search_query = {
@@ -281,7 +317,6 @@ def update_status():
         
         if response['hits']['total']['value'] > 0:
             # Update all matching documents
-            updated_count = 0
             for hit in response['hits']['hits']:
                 doc_id = hit['_id']
                 update_body = {
@@ -487,6 +522,145 @@ def search():
         logger.error(f"Error in /search endpoint: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/add_discussion', methods=['POST'])
+def add_discussion():
+    """Add discussion to an existing incident"""
+    try:
+        data = request.get_json()
+        issue_id = data.get('linked_issue_id')
+        discussion_text = data.get('text')
+        user_id = data.get('user_id')
+        timestamp = data.get('timestamp', datetime.utcnow().isoformat())
+        
+        if not issue_id or not discussion_text:
+            return jsonify({"error": "Missing issue_id or text"}), 400
+        
+        # Search for the incident by issue_id
+        result = es.search(
+            index="thala_knowledge",
+            body={
+                "query": {
+                    "term": {"issue_id": issue_id}
+                }
+            }
+        )
+        
+        if not result['hits']['hits']:
+            return jsonify({"error": f"Incident {issue_id} not found"}), 404
+        
+        # Get the document ID
+        doc_id = result['hits']['hits'][0]['_id']
+        doc = result['hits']['hits'][0]['_source']
+        
+        # Add discussion to the document
+        discussions = doc.get('discussions', [])
+        discussions.append({
+            'text': discussion_text,
+            'user_id': user_id,
+            'timestamp': timestamp
+        })
+        
+        # Update the document
+        es.update(
+            index="thala_knowledge",
+            id=doc_id,
+            body={
+                "doc": {
+                    "discussions": discussions
+                }
+            }
+        )
+        
+        logger.info(f"Added discussion to incident {issue_id}")
+        
+        return jsonify({
+            "message": "Discussion added successfully",
+            "issue_id": issue_id,
+            "discussion_count": len(discussions)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in /add_discussion endpoint: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/lookup_incident', methods=['POST'])
+def lookup_incident():
+    """Lookup incident by issue_id or Elasticsearch document _id"""
+    try:
+        data = request.get_json()
+        issue_id = data.get('issue_id')
+        
+        if not issue_id:
+            return jsonify({"error": "No issue_id provided"}), 400
+        
+        # First, try to get by Elasticsearch document _id (in case user referenced the document ID shown in UI)
+        try:
+            doc = es.get(index="thala_knowledge", id=issue_id)
+            source = doc['_source']
+            logger.info(f"Found incident by document _id: {issue_id}")
+            
+            return jsonify({
+                "found": True,
+                "issue_id": source.get('issue_id', issue_id),  # Return the actual issue_id field
+                "document_id": issue_id,  # Return the document _id that was searched
+                "text": source.get('text', ''),
+                "status": source.get('status', 'Open'),
+                "source": source.get('source', 'unknown'),
+                "timestamp": source.get('timestamp'),
+                "category": source.get('category'),
+                "severity": source.get('severity'),
+                "resolution_text": source.get('resolution_text'),
+                "resolved_by": source.get('resolved_by'),
+                "resolved_at": source.get('resolved_at')
+            })
+        except Exception as doc_error:
+            # Document not found by _id, try searching by issue_id field
+            logger.debug(f"Not found by document _id, trying issue_id field: {doc_error}")
+            pass
+        
+        # Search for the incident by issue_id field
+        search_query = {
+            "query": {
+                "term": {
+                    "issue_id": issue_id
+                }
+            },
+            "size": 1,
+            "sort": [
+                {"timestamp": {"order": "desc"}}
+            ]
+        }
+        
+        response = es.search(index="thala_knowledge", body=search_query)
+        
+        if response['hits']['total']['value'] > 0:
+            hit = response['hits']['hits'][0]
+            source = hit['_source']
+            
+            return jsonify({
+                "found": True,
+                "issue_id": issue_id,
+                "document_id": hit['_id'],  # Also return the document _id
+                "text": source.get('text', ''),
+                "status": source.get('status', 'Open'),
+                "source": source.get('source', 'unknown'),
+                "timestamp": source.get('timestamp'),
+                "category": source.get('category'),
+                "severity": source.get('severity'),
+                "resolution_text": source.get('resolution_text'),
+                "resolved_by": source.get('resolved_by'),
+                "resolved_at": source.get('resolved_at')
+            })
+        else:
+            return jsonify({
+                "found": False,
+                "issue_id": issue_id
+            }), 404
+            
+    except Exception as e:
+        logger.error(f"Error in /lookup_incident endpoint: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint"""
@@ -499,14 +673,19 @@ def health():
 def initialize_app():
     """Initialize the application"""
     logger.info("Initializing ITSM Incident Prediction System...")
+    logger.info("=" * 60)
+    logger.info("NOTE: ML training disabled - using Gemini for predictions")
+    logger.info("Flask API will only store incidents in Elasticsearch")
+    logger.info("=" * 60)
     
-    # Load and train initial model
-    load_and_train_initial_model()
+    # Skip ML training - we're using Gemini now
+    # load_and_train_initial_model()  # DISABLED
     
-    # Start auto-training scheduler in background thread
-    scheduler_thread = threading.Thread(target=schedule_auto_training, daemon=True)
-    scheduler_thread.start()
-    logger.info("Auto-training scheduler started (runs every hour)")
+    # Skip auto-training scheduler
+    # scheduler_thread = threading.Thread(target=schedule_auto_training, daemon=True)
+    # scheduler_thread.start()
+    
+    logger.info("Flask API ready - endpoints: /index, /search, /health")
 
 if __name__ == '__main__':
     initialize_app()

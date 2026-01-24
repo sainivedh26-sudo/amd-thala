@@ -1,0 +1,26 @@
+# Thala AI - UI Integration Requirements
+
+# Slack Bot
+slack-bolt>=1.18.0
+slack-sdk>=3.23.0
+
+# Jira Panel
+flask-cors>=4.0.0
+
+# Gemini AI for predictions
+google-genai>=0.2.0
+
+# Data processing
+pandas>=2.0.0
+
+# Already in main requirements.txt:
+# flask
+# requests
+# python-dotenv
+
+
+
+
+
+
+

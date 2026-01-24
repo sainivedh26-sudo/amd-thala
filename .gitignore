@@ -14,6 +14,7 @@ env/
 # Environment Variables
 .env
 src/.env
+aws/.env
 *.env
 !CONFIG_TEMPLATE.env
 
@@ -70,3 +71,14 @@ start_thala.sh
 verify_system.bat
 
 thala/
+
+
+
+team-thala\UI_SETUP_GUIDE.md
+team-thala\UI_ARCHITECTURE.md
+team-thala\SLACK_FILES_READ_SETUP.md
+
+IMPLEMENTATION_SUMMARY.md
+
+
+
