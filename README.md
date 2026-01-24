@@ -5,9 +5,11 @@
 ![made-with-python](https://img.shields.io/badge/Made%20with-Python3-brightgreen)
 
 <!-- LOGO -->
-# Thala
+<!-- LOGO -->
 <br />
 <p align="center">
+  <h1 style="font-size: 72px;">Thala</h1>
+</p>
   <p align="center">
     Intelligent incident management system for automated detection, classification, and resolution tracking.
     <br />
@@ -21,6 +23,7 @@
   <a href="#usage">Usage</a> •
   <a href="#api-endpoints">API Endpoints</a>
 </p>
+
 
 ## About The Project
 
