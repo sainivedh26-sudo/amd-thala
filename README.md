@@ -52,7 +52,7 @@ Thala is an intelligent incident management system that automatically:
 
 1. **Ingestion**: Slack/Jira/Email → Connectors → Kafka
 2. **Classification**: Groq LLM classifies messages (incident, resolution, discussion, unrelated)
-3. **Prediction**: Groq agent predicts category & severity
+3. **Prediction**: AWS Bedrock (llama-3.3-70b) agent predicts category & severity
 4. **Attachment Processing**: Images → S3 → Textract → Extracted text → Context
 5. **Storage**: Flask API → Elasticsearch (with embeddings for semantic search)
 6. **Resolution Tracking**: Links resolution messages to original incidents
@@ -72,7 +72,7 @@ Thala is an intelligent incident management system that automatically:
 
 
 ### 1. Intelligent Classification
-- Uses Groq LLM (llama-3.3-70b) to classify messages semantically
+- Uses LLM from AWS Bedrock (llama-3.3-70b) to classify messages semantically
 - No keyword matching - pure agent understanding
 - Types: incident_report, resolution, discussion, unrelated
 
@@ -125,7 +125,6 @@ pip install -r team-thala/src/ui_requirements.txt
 Create `.env` file in the root directory:
 ```ini
 # Groq (for classification & prediction)
-GROQ_API_KEY=your-groq-api-key
 
 # Slack (Bot Token, NOT App Token)
 SLACK_BOT_TOKEN=xoxb-your-bot-token
@@ -195,7 +194,6 @@ python team-thala/src/slack_bot_ui.py
 /thala                          # Show help and available commands
 /thala latest_issue [page]      # View ongoing incidents (paginated, 10 per page)
 /thala search <query>           # Search similar resolved incidents
-/thala predict <description>    # Predict incident category and severity
 ```
 
 ## How It Works
@@ -203,7 +201,7 @@ python team-thala/src/slack_bot_ui.py
 ### Incident Creation Flow
 ```
 Slack: "API server is down"
-  → Groq LLM classifies as "incident_report"
+  → LLM from AWS Bedrock (llama-3.3-70b) classifies as "incident_report"
   → Groq predicts: Category=API, Severity=High
   → Sent to Kafka → Flask → Elasticsearch
   → Tracked in Incident Tracker
@@ -213,7 +211,7 @@ Slack: "API server is down"
 ### Resolution Flow
 ```
 Slack: "API issue has been fixed"
-  → Groq LLM classifies as "resolution"
+  → LLM from AWS Bedrock (llama-3.3-70b) classifies as "resolution"
   → Semantic search finds matching open incident
   → Updates status to "Resolved" in Elasticsearch
   → Logs resolution text, resolved_by, resolved_at
@@ -244,7 +242,7 @@ Slack: /thala search "database timeout"
 
 ### slack_connector_enhanced.py
 - Monitors Slack channels for messages
-- Classifies messages using Groq LLM
+- Classifies messages using LLM from AWS Bedrock (llama-3.3-70b)
 - Processes attachments (S3 + Textract)
 - Detects resolutions and links to incidents
 - Prevents resolution messages from creating new incidents
