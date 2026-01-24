@@ -354,28 +354,6 @@ Find incident by ID
 - Uses conversational context (recent incidents)
 - Fallback to most recent open incident if no match
 
-## Common Issues
-
-### "Missing scope: files:read"
-- Add `files:read` scope in Slack app settings
-- Reinstall app to workspace
-- See: `team-thala/SLACK_FILES_READ_SETUP.md`
-
-### "Cannot identify image file"
-- Image format issue (converted to JPEG automatically)
-- Slack bot may not have proper file download permissions
-- Check S3 upload succeeded before Textract
-
-### "Resolution not linking"
-- Check logs for similarity scores (should be > 0.3)
-- Verify incident exists in Elasticsearch
-- Ensure incident is still "Open" status
-
-### "Vague messages creating incidents"
-- System now requires technical details OR successful image extraction
-- Vague messages without image context are classified as "discussion"
-- Check attachment extraction logs
-
 ## Credits
 
 - Built with Groq LLM for intelligent classification
