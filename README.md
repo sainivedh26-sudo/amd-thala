@@ -5,7 +5,6 @@
 ![made-with-python](https://img.shields.io/badge/Made%20with-Python3-brightgreen)
 
 <!-- LOGO -->
-<!-- LOGO -->
 <br />
 <p align="center">
   <h1 style="font-size: 72px;">Thala</h1>
