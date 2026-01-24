@@ -1,0 +1,3 @@
+jira 
+kafka-python-ng 
+slack

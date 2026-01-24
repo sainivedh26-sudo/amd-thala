@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+thala/
+venv/
+ENV/
+env/
+
+# Environment Variables
+.env
+src/.env
+*.env
+!CONFIG_TEMPLATE.env
+
+# Training Data & Backups
+initial_data.csv
+initial_data_backup*.csv
+generated_training_data.csv
+
+# Model Files
+xgboost_incident.json
+
+# Logs
+*.log
+logs/
+team-thala/src/logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Elasticsearch
+data/
+
+# Kafka
+kafka-logs/
+
+# Test Files
+test_*.py
+*_test.py
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Data Files
+*.jsonl
+*.csv
+!requirements.txt
+
+# Temporary Files
+*.tmp
+*.bak
+
+restart_with_autolabeling.bat
+start_thala.bat
+start_thala.sh
+verify_system.bat
+
+thala/

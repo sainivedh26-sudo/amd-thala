@@ -1,0 +1,14 @@
+flask
+transformers
+elasticsearch
+numpy
+xgboost
+sentence-transformers
+pandas
+schedule
+requests
+python-dotenv
+jira
+slack-sdk
+kafka-python-ng
+google-genai
