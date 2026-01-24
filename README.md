@@ -8,7 +8,7 @@
 <!-- LOGO -->
 <br />
 <h1 align="center">
-  <font size="7">Thala</font>
+  <font size="7">THALA</font>
 </h1>
   <p align="center">
     Intelligent incident management system for automated detection, classification, and resolution tracking.
