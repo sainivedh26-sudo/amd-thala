@@ -53,9 +53,9 @@ Thala is an intelligent incident management system that automatically:
      ┌─────────────┴─────────────┐
      │                           │
 ┌────▼─────────┐         ┌───────▼──────────┐
-│ Slack/Jira   │         │   Flask API       │
-│ Connectors   │         │   (Backend)       │
-│ (Groq LLM)   │         │                   │
+│ Slack/Jira   │         │   Flask API      │
+│ Connectors   │         │   (Backend)      │
+│ (Groq LLM)   │         │                  │
 └────┬─────────┘         └───────┬──────────┘
      │                           │
      │                           │
