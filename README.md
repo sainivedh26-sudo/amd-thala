@@ -31,7 +31,7 @@
 <h2>Ready to check the demo ?</h2>
 <br>
 
-[![Agnent Thala Prototype Launch](https://github.com/user-attachments/assets/3efb52f1-96f9-4f73-8e20-4643aafeb749)](https://youtu.be/jhLuYSsVMOA)
+[![Agnent Thala Prototype Launch](https://github.com/user-attachments/assets/3efb52f1-96f9-4f73-8e20-4643aafeb749)](https://www.youtube.com/watch?v=pK1OFuGYdEE)
 
 
 
