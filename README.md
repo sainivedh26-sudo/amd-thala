@@ -91,7 +91,7 @@ Thala is an intelligent incident management system that automatically:
 - **Category**: Database, API, Frontend, Infrastructure, Authentication, etc.
 - **Severity**: Critical, High, Medium, Low
 - **Likelihood**: Likely, Unlikely (for new queries)
-- Uses Groq LLM with few-shot learning
+- Uses Llama model with few-shot learning
 
 ### 5. Semantic Search
 - Finds similar past incidents using vector embeddings
@@ -124,7 +124,6 @@ pip install -r team-thala/src/ui_requirements.txt
 
 Create `.env` file in the root directory:
 ```ini
-# Groq (for classification & prediction)
 
 # Slack (Bot Token, NOT App Token)
 SLACK_BOT_TOKEN=xoxb-your-bot-token
@@ -202,7 +201,7 @@ python team-thala/src/slack_bot_ui.py
 ```
 Slack: "API server is down"
   → LLM from AWS Bedrock (llama-3.3-70b) classifies as "incident_report"
-  → Groq predicts: Category=API, Severity=High
+  → It predicts: Category=API, Severity=High
   → Sent to Kafka → Flask → Elasticsearch
   → Tracked in Incident Tracker
   → Available in Slack: /thala latest_issue
@@ -323,10 +322,6 @@ Find incident by ID
 - **App Token** (xapp-...): Only for Socket Mode (not used currently)
 - **Use Bot Token** in SLACK_BOT_TOKEN environment variable
 
-### LLM Providers
-- **Classification**: Groq (llama-3.3-70b-versatile)
-- **Prediction**: Groq (was Gemini, migrated)
-- **Search**: Sentence Transformers (local embeddings)
 
 ### Attachment Requirements
 - Slack app must have `files:read` scope
@@ -345,3 +340,9 @@ Find incident by ID
 [Sai Nivedh](https://www.github.com/SaiNivedh26)
 
 [Kishore Balaji](https://www.github.com/Kishore-1803)
+
+<br>
+
+### If you like this, then
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/sai_nivedh_26)
+
