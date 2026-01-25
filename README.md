@@ -2,6 +2,15 @@
 <img width="1024" height="1024" alt="image-Photoroom" src="Logo.png" />
 
 ![made-with-python](https://img.shields.io/badge/Made%20with-Python3-brightgreen)
+![Flask](https://img.shields.io/badge/Flask-000?logo=flask&logoColor=fff) ![Python 3.12+](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=fff)
+![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-000?logo=apachekafka&logoColor=fff)
+![Elasticsearch](https://img.shields.io/badge/Elasticsearch-0377CC?logo=elasticsearch&logoColor=fff)
+![AWS Bedrock](https://img.shields.io/badge/AWS%20Bedrock-FF9900?logo=aws&logoColor=fff) ![Hugging Face](https://img.shields.io/badge/Hugging%20Face-FFD21E?logo=huggingface&logoColor=000)
+![AWS S3](https://img.shields.io/badge/Amazon%20S3-FF9900?logo=amazons3&logoColor=fff) ![AWS Textract](https://img.shields.io/badge/AWS%20Textract-FF9900?logo=aws&logoColor=fff)
+![Nginx](https://img.shields.io/badge/nginx-009639?logo=nginx&logoColor=fff)
+![Slack](https://img.shields.io/badge/Slack-4A154B?logo=slack&logoColor=fff) ![Jira](https://img.shields.io/badge/Jira-0052CC?logo=jira&logoColor=fff)
+![boto3](https://img.shields.io/badge/boto3-FF9900?logo=aws&logoColor=fff)
+![beautifulsoup4](https://img.shields.io/badge/beautifulsoup4-000?logo=python&logoColor=fff)
 
 <!-- LOGO -->
 <!-- LOGO -->
