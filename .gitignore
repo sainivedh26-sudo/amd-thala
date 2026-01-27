@@ -80,8 +80,13 @@ team-thala\SLACK_FILES_READ_SETUP.md
 
 IMPLEMENTATION_SUMMARY.md
 
-bridges\msk-redis-bridge-java\.env
-bridges\msk-redis-bridge-java\src\main\java\com\thala\.env
+bridges/msk-redis-bridge-java/.env
+bridges/msk-redis-bridge-java/src/main/java/com/thala/.env
+!bridges/msk-redis-bridge-java/src/main/java/com/thala/
+
+# Ignore Gradle build outputs for the Java bridge
+bridges/msk-redis-bridge-java/.gradle/
+bridges/msk-redis-bridge-java/build/
 
 
 AWS_MIGRATION_GUIDE.md

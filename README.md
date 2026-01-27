@@ -2,6 +2,15 @@
 <img width="1024" height="1024" alt="image-Photoroom" src="Logo.png" />
 
 ![made-with-python](https://img.shields.io/badge/Made%20with-Python3-brightgreen)
+![Flask](https://img.shields.io/badge/Flask-000?logo=flask&logoColor=fff) ![Python 3.12+](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=fff)
+![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-000?logo=apachekafka&logoColor=fff)
+![Elasticsearch](https://img.shields.io/badge/Elasticsearch-0377CC?logo=elasticsearch&logoColor=fff)
+![AWS Bedrock](https://img.shields.io/badge/AWS%20Bedrock-FF9900?logo=aws&logoColor=fff) ![Hugging Face](https://img.shields.io/badge/Hugging%20Face-FFD21E?logo=huggingface&logoColor=000)
+![AWS S3](https://img.shields.io/badge/Amazon%20S3-FF9900?logo=amazons3&logoColor=fff) ![AWS Textract](https://img.shields.io/badge/AWS%20Textract-FF9900?logo=aws&logoColor=fff)
+![Nginx](https://img.shields.io/badge/nginx-009639?logo=nginx&logoColor=fff)
+![Slack](https://img.shields.io/badge/Slack-4A154B?logo=slack&logoColor=fff) ![Jira](https://img.shields.io/badge/Jira-0052CC?logo=jira&logoColor=fff)
+![boto3](https://img.shields.io/badge/boto3-FF9900?logo=aws&logoColor=fff)
+![beautifulsoup4](https://img.shields.io/badge/beautifulsoup4-000?logo=python&logoColor=fff)
 
 <!-- LOGO -->
 <!-- LOGO -->
@@ -31,7 +40,7 @@
 <h2>Ready to check the demo ?</h2>
 <br>
 
-[![Agnent Thala Prototype Launch](https://github.com/user-attachments/assets/3efb52f1-96f9-4f73-8e20-4643aafeb749)](https://youtu.be/jhLuYSsVMOA)
+[![Agnent Thala Prototype Launch](https://github.com/user-attachments/assets/3efb52f1-96f9-4f73-8e20-4643aafeb749)](https://www.youtube.com/watch?v=pK1OFuGYdEE)
 
 
 
@@ -47,12 +56,11 @@ Thala is an intelligent incident management system that automatically:
 ## Architecture
 <img width="1912" height="1076" alt="architecture-thala" src="u-arch.jpg" />
 
-
 ## Data Flow
 
 1. **Ingestion**: Slack/Jira/Email → Connectors → Kafka
 2. **Classification**: Llama 3.3 70b LLM classifies messages (incident, resolution, discussion, unrelated)
-3. **Prediction**: Groq agent predicts category & severity
+3. **Prediction**: AWS Bedrock (llama-3.3-70b) agent predicts category & severity
 4. **Attachment Processing**: Images → S3 → Textract → Extracted text → Context
 5. **Storage**: Flask API → Elasticsearch (with embeddings for semantic search)
 6. **Resolution Tracking**: Links resolution messages to original incidents
@@ -72,7 +80,7 @@ Thala is an intelligent incident management system that automatically:
 
 
 ### 1. Intelligent Classification
-- Uses LLM (llama-3.3-70b) - inference via Bedrock, to classify messages semantically
+- Uses LLM from AWS Bedrock (llama-3.3-70b) to classify messages semantically
 - No keyword matching - pure agent understanding
 - Types: incident_report, resolution, discussion, unrelated
 
@@ -91,7 +99,7 @@ Thala is an intelligent incident management system that automatically:
 - **Category**: Database, API, Frontend, Infrastructure, Authentication, etc.
 - **Severity**: Critical, High, Medium, Low
 - **Likelihood**: Likely, Unlikely (for new queries)
-- Uses Groq LLM with few-shot learning
+- Uses Llama model with few-shot learning
 
 ### 5. Semantic Search
 - Finds similar past incidents using vector embeddings
@@ -124,34 +132,73 @@ pip install -r team-thala/src/ui_requirements.txt
 
 Create `.env` file in the root directory:
 ```ini
-# Groq (for classification & prediction)
-GROQ_API_KEY=your-groq-api-key
 
-# Slack (Bot Token, NOT App Token)
-SLACK_BOT_TOKEN=xoxb-your-bot-token
-SLACK_CHANNEL_ID=C01234567890
+GEMINI_API_KEY=
+FLASK_API_URL=http://localhost:5000
 
-# Jira
-JIRA_URL=https://your-instance.atlassian.net
-JIRA_EMAIL=your-email@example.com
-JIRA_API_TOKEN=your-jira-token
+# Elasticsearch Configuration (if remote, change localhost to your ES host)
+ELASTICSEARCH_HOST=https://localhost:9200
+SLACK_APP_TOKEN=
 
-# Kafka
+JIRA_URL=https://kphotos1803.atlassian.net
+JIRA_EMAIL=
+JIRA_API_TOKEN= 
+
+SLACK_BOT_TOKEN=
+SLACK_CHANNEL_ID=
+
+# Kafka Configuration
 KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 KAFKA_TOPIC_SLACK=thala-slack-events
 KAFKA_TOPIC_JIRA=thala-jira-events
 
-# Flask API
-FLASK_API_URL=http://localhost:5000
+# Logging Configuration
+LOG_LEVEL=INFO
+LOG_FILE=logs/thala_ingestion.log
 
-# AWS (for attachment processing)
-AWS_ACCESS_KEY_ID=your-access-key
-AWS_SECRET_ACCESS_KEY=your-secret-key
+
+
+# Elasticsearch Configuration (if remote, change localhost to your ES host)
+
+
+AWS_LAMBDA_URL=
+
+
+
+# Kafka Configuration
+KAFKA_TOPIC_SLACK=thala-slack-events
+KAFKA_TOPIC_JIRA=thala-jira-events
+
+
+SEARCH_BACKEND=opensearch_serverless 
 AWS_REGION=us-east-2
-AWS_S3_BUCKET=thala-images
 
-# Elasticsearch
-ELASTICSEARCH_URL=http://localhost:9200
+
+AWS_ACCESS_KEY_ID=""
+AWS_SECRET_ACCESS_KEY=""
+AWS_SESSION_TOKEN="" 
+
+FunctionUrl= ""
+FunctionArn= ""
+
+
+AWS_BEARER_TOKEN_BEDROCK="" 
+
+OPENSEARCH_HOST = ""
+
+
+
+KAFKA_BOOTSTRAP_SERVERS=""
+
+
+REDIS_FALLBACK_ENABLED=true
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_LIST_PREFIX=thala:queue:
+
+AWS_REGION=us-east-2
+BEDROCK_LLAMA_MODEL_ID=meta.llama3-3-70b-instruct-v1:0
+
 ```
 
 ### Slack App Setup
@@ -195,7 +242,6 @@ python team-thala/src/slack_bot_ui.py
 /thala                          # Show help and available commands
 /thala latest_issue [page]      # View ongoing incidents (paginated, 10 per page)
 /thala search <query>           # Search similar resolved incidents
-/thala predict <description>    # Predict incident category and severity
 ```
 
 ## How It Works
@@ -203,8 +249,8 @@ python team-thala/src/slack_bot_ui.py
 ### Incident Creation Flow
 ```
 Slack: "API server is down"
-  → Groq LLM classifies as "incident_report"
-  → Groq predicts: Category=API, Severity=High
+  → LLM from AWS Bedrock (llama-3.3-70b) classifies as "incident_report"
+  → It predicts: Category=API, Severity=High
   → Sent to Kafka → Flask → Elasticsearch
   → Tracked in Incident Tracker
   → Available in Slack: /thala latest_issue
@@ -213,7 +259,7 @@ Slack: "API server is down"
 ### Resolution Flow
 ```
 Slack: "API issue has been fixed"
-  → Groq LLM classifies as "resolution"
+  → LLM from AWS Bedrock (llama-3.3-70b) classifies as "resolution"
   → Semantic search finds matching open incident
   → Updates status to "Resolved" in Elasticsearch
   → Logs resolution text, resolved_by, resolved_at
@@ -244,7 +290,7 @@ Slack: /thala search "database timeout"
 
 ### slack_connector_enhanced.py
 - Monitors Slack channels for messages
-- Classifies messages using Groq LLM
+- Classifies messages using LLM from AWS Bedrock (llama-3.3-70b)
 - Processes attachments (S3 + Textract)
 - Detects resolutions and links to incidents
 - Prevents resolution messages from creating new incidents
@@ -256,7 +302,7 @@ Slack: /thala search "database timeout"
 - Semantic search interface
 - Rich UI with Slack Block Kit
 
-### gemini_predictor.py (uses Groq)
+### gemini_predictor.py (uses Llama model from AWS Bedrock now)
 - Predicts category & severity
 - Uses few-shot learning with training examples
 - Caches predictions (24h TTL)
@@ -325,10 +371,6 @@ Find incident by ID
 - **App Token** (xapp-...): Only for Socket Mode (not used currently)
 - **Use Bot Token** in SLACK_BOT_TOKEN environment variable
 
-### LLM Providers
-- **Classification**: Groq (llama-3.3-70b-versatile)
-- **Prediction**: Groq (was Gemini, migrated)
-- **Search**: Sentence Transformers (local embeddings)
 
 ### Attachment Requirements
 - Slack app must have `files:read` scope
@@ -342,9 +384,14 @@ Find incident by ID
 - Uses conversational context (recent incidents)
 - Fallback to most recent open incident if no match
 
-## Credits
+## Developers
 
-- Built with Groq LLM for intelligent classification
-- AWS Textract for image text extraction
-- Elasticsearch for semantic search
-- Kafka for real-time event streaming
+[Sai Nivedh](https://www.github.com/SaiNivedh26)
+
+[Kishore Balaji](https://www.github.com/Kishore-1803)
+
+<br>
+
+### If you like this, then
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/sai_nivedh_26)
+
