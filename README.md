@@ -45,13 +45,13 @@ Thala is an intelligent incident management system that automatically:
 - Extracts text from image attachments using AWS Textract
 
 ## Architecture
-<img width="1912" height="1076" alt="architecture-thala" src="https://github.com/user-attachments/assets/b393e411-f913-4ba2-8bba-13848aca0f16" />
+<img width="1912" height="1076" alt="architecture-thala" src="u-arch.jpg" />
 
 
 ## Data Flow
 
 1. **Ingestion**: Slack/Jira/Email → Connectors → Kafka
-2. **Classification**: Groq LLM classifies messages (incident, resolution, discussion, unrelated)
+2. **Classification**: Llama 3.3 70b LLM classifies messages (incident, resolution, discussion, unrelated)
 3. **Prediction**: Groq agent predicts category & severity
 4. **Attachment Processing**: Images → S3 → Textract → Extracted text → Context
 5. **Storage**: Flask API → Elasticsearch (with embeddings for semantic search)
@@ -72,7 +72,7 @@ Thala is an intelligent incident management system that automatically:
 
 
 ### 1. Intelligent Classification
-- Uses Groq LLM (llama-3.3-70b) to classify messages semantically
+- Uses LLM (llama-3.3-70b) - inference via Bedrock, to classify messages semantically
 - No keyword matching - pure agent understanding
 - Types: incident_report, resolution, discussion, unrelated
 
