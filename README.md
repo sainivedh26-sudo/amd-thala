@@ -60,7 +60,7 @@ Thala is an intelligent incident management system that automatically:
 ## Data Flow
 
 1. **Ingestion**: Slack/Jira/Email → Connectors → Kafka
-2. **Classification**: Groq LLM classifies messages (incident, resolution, discussion, unrelated)
+2. **Classification**: Llama 3.3 70b LLM classifies messages (incident, resolution, discussion, unrelated)
 3. **Prediction**: AWS Bedrock (llama-3.3-70b) agent predicts category & severity
 4. **Attachment Processing**: Images → S3 → Textract → Extracted text → Context
 5. **Storage**: Flask API → Elasticsearch (with embeddings for semantic search)
