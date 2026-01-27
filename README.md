@@ -54,8 +54,7 @@ Thala is an intelligent incident management system that automatically:
 - Extracts text from image attachments using AWS Textract
 
 ## Architecture
-<img width="1912" height="1076" alt="architecture-thala" src="https://github.com/user-attachments/assets/b393e411-f913-4ba2-8bba-13848aca0f16" />
-
+<img width="1912" height="1076" alt="architecture-thala" src="u-arch.jpg" />
 
 ## Data Flow
 
@@ -134,31 +133,72 @@ pip install -r team-thala/src/ui_requirements.txt
 Create `.env` file in the root directory:
 ```ini
 
-# Slack (Bot Token, NOT App Token)
-SLACK_BOT_TOKEN=xoxb-your-bot-token
-SLACK_CHANNEL_ID=C01234567890
+GEMINI_API_KEY=
+FLASK_API_URL=http://localhost:5000
 
-# Jira
-JIRA_URL=https://your-instance.atlassian.net
-JIRA_EMAIL=your-email@example.com
-JIRA_API_TOKEN=your-jira-token
+# Elasticsearch Configuration (if remote, change localhost to your ES host)
+ELASTICSEARCH_HOST=https://localhost:9200
+SLACK_APP_TOKEN=
 
-# Kafka
+JIRA_URL=https://kphotos1803.atlassian.net
+JIRA_EMAIL=
+JIRA_API_TOKEN= 
+
+SLACK_BOT_TOKEN=
+SLACK_CHANNEL_ID=
+
+# Kafka Configuration
 KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 KAFKA_TOPIC_SLACK=thala-slack-events
 KAFKA_TOPIC_JIRA=thala-jira-events
 
-# Flask API
-FLASK_API_URL=http://localhost:5000
+# Logging Configuration
+LOG_LEVEL=INFO
+LOG_FILE=logs/thala_ingestion.log
 
-# AWS (for attachment processing)
-AWS_ACCESS_KEY_ID=your-access-key
-AWS_SECRET_ACCESS_KEY=your-secret-key
+
+
+# Elasticsearch Configuration (if remote, change localhost to your ES host)
+
+
+AWS_LAMBDA_URL=
+
+
+
+# Kafka Configuration
+KAFKA_TOPIC_SLACK=thala-slack-events
+KAFKA_TOPIC_JIRA=thala-jira-events
+
+
+SEARCH_BACKEND=opensearch_serverless 
 AWS_REGION=us-east-2
-AWS_S3_BUCKET=thala-images
 
-# Elasticsearch
-ELASTICSEARCH_URL=http://localhost:9200
+
+AWS_ACCESS_KEY_ID=""
+AWS_SECRET_ACCESS_KEY=""
+AWS_SESSION_TOKEN="" 
+
+FunctionUrl= ""
+FunctionArn= ""
+
+
+AWS_BEARER_TOKEN_BEDROCK="" 
+
+OPENSEARCH_HOST = ""
+
+
+
+KAFKA_BOOTSTRAP_SERVERS=""
+
+
+REDIS_FALLBACK_ENABLED=true
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_LIST_PREFIX=thala:queue:
+
+AWS_REGION=us-east-2
+BEDROCK_LLAMA_MODEL_ID=meta.llama3-3-70b-instruct-v1:0
+
 ```
 
 ### Slack App Setup

@@ -80,5 +80,32 @@ team-thala\SLACK_FILES_READ_SETUP.md
 
 IMPLEMENTATION_SUMMARY.md
 
+bridges/msk-redis-bridge-java/.env
+bridges/msk-redis-bridge-java/src/main/java/com/thala/.env
+!bridges/msk-redis-bridge-java/src/main/java/com/thala/
+
+# Ignore Gradle build outputs for the Java bridge
+bridges/msk-redis-bridge-java/.gradle/
+bridges/msk-redis-bridge-java/build/
 
 
+AWS_MIGRATION_GUIDE.md
+check_elasticsearch_status.py
+cleanup_duplicate_issues.py
+clear_all_data.bat
+clear_opensearch_simple.py
+conn_check.py
+fix_kafka_complete.bat
+fix_kafka_storage.bat
+format_kafka_storage.bat
+team-thala/DEMO_SCENARIO.md
+team-thala/src/run_jira_connector.bat
+
+clear_all_data.py
+fix_jira_statuses.py
+fix_kafka_storage.py
+mark_jira_deleted.py
+mark_resolved_manual.py
+team-thala/SLACK_FILES_READ_SETUP.md
+team-thala/UI_ARCHITECTURE.md
+team-thala/UI_SETUP_GUIDE.md

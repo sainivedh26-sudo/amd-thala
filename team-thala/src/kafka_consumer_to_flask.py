@@ -15,7 +15,11 @@ from dotenv import load_dotenv
 import time
 from datetime import datetime
 from incident_tracker import get_tracker
-from gemini_predictor import get_predictor
+# Prefer Bedrock predictor (LLM on AWS). Fallback to Groq if unavailable.
+try:
+    from bedrock_predictor import get_predictor
+except Exception:
+    from gemini_predictor import get_predictor
 
 load_dotenv()
 
@@ -32,7 +36,6 @@ class KafkaToFlaskBridge:
         self.topics = [
             os.getenv('KAFKA_TOPIC_SLACK', 'thala-slack-events'),
             os.getenv('KAFKA_TOPIC_JIRA', 'thala-jira-events'),
-            os.getenv('KAFKA_TOPIC_EMAIL', 'thala-email-events')
         ]
         self.logger = logging.getLogger(__name__)
         self.consumer = None
@@ -260,7 +263,7 @@ class KafkaToFlaskBridge:
             # Check if this is a discussion update
             if payload.get('type') == 'discussion':
                 endpoint = f"{self.flask_url}/add_discussion"
-                response = requests.post(endpoint, json=payload, timeout=10)
+                response = requests.post(endpoint, json=payload, timeout=30)
                 
                 if response.status_code == 200:
                     self.logger.info(f"[OK] Discussion added to {payload.get('linked_issue_id')}")
@@ -272,7 +275,7 @@ class KafkaToFlaskBridge:
             # Check if this is a status update
             if payload.get('action') == 'update_status':
                 endpoint = f"{self.flask_url}/update_status"
-                response = requests.post(endpoint, json=payload, timeout=10)
+                response = requests.post(endpoint, json=payload, timeout=30)
                 
                 if response.status_code == 200:
                     self.logger.info(f"[OK] Status updated for {payload.get('original_issue_id')}: {payload.get('status')}")
@@ -288,7 +291,7 @@ class KafkaToFlaskBridge:
             response = requests.post(
                 f"{self.flask_url}/index",
                 json=payload,
-                timeout=10
+                timeout=30
             )
             
             if response.status_code == 200:

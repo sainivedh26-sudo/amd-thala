@@ -1,0 +1,52 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.thala'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.apache.kafka:kafka-clients:3.7.0'
+    implementation 'software.amazon.msk:aws-msk-iam-auth:2.0.3'
+    implementation 'redis.clients:jedis:5.1.0'
+    implementation 'org.slf4j:slf4j-simple:2.0.13'
+}
+
+application {
+    mainClass = 'com.thala.BridgeApp'
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+// Load environment variables from a .env file for `gradle run` (helpful on Windows)
+tasks.named('run') {
+    doFirst {
+        def loadEnvFile = { File f ->
+            if (f.exists()) {
+                def props = new Properties()
+                f.withInputStream { props.load(it) }
+                props.each { k, v ->
+                    // Trim optional surrounding quotes
+                    def val = v?.toString()?.trim()
+                    if (val?.startsWith('"') && val?.endsWith('"')) {
+                        val = val.substring(1, val.length()-1)
+                    }
+                    environment k.toString(), val
+                }
+                println "Loaded env from ${f.absolutePath}"
+            }
+        }
+        // Try local .env in bridge dir, then repo root
+        loadEnvFile(file('.env'))
+        loadEnvFile(file('..'+File.separator+'..'+File.separator+'.env'))
+    }
+}
+
+

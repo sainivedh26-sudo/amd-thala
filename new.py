@@ -1,4 +1,6 @@
-from elasticsearch import Elasticsearch
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'team-thala', 'src'))
+from search_client import get_search_client
 from sentence_transformers import SentenceTransformer
 from flask import Flask, request, jsonify
 import numpy as np
@@ -9,7 +11,6 @@ import threading
 import time
 import logging
 from datetime import datetime
-import os
 
 # Configure logging
 logging.basicConfig(
@@ -22,13 +23,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Connect to Elasticsearch
-es = Elasticsearch(
-    hosts=["https://localhost:9200"],
-    ca_certs="D:\\elasticsearch-9.1.5-windows-x86_64\\elasticsearch-9.1.5\\config\\certs\\http_ca.crt",
-    verify_certs=False,
-    basic_auth=("elastic", "NHyNwkjjOmO1GwUBU54_")
-)
+# Connect to search backend (Elasticsearch / OpenSearch / OpenSearch Serverless)
+es = get_search_client()
+SEARCH_BACKEND = os.getenv('SEARCH_BACKEND', 'elasticsearch').lower()
 
 # Define the enhanced index mapping
 mapping = {
@@ -43,7 +40,9 @@ mapping = {
             "resolution_text": {"type": "text"},
             "resolved_by": {"type": "keyword"},
             "resolved_at": {"type": "date"},
-            "issue_id": {"type": "keyword"}
+            "issue_id": {"type": "keyword"},
+            "category": {"type": "keyword"},
+            "severity": {"type": "keyword"}
         }
     }
 }
@@ -206,7 +205,7 @@ def schedule_auto_training():
         time.sleep(60)
 
 # Index embeddings function
-def index_embeddings(texts, embeddings, timestamp=None, status=None, incident_likelihood=None, source=None, issue_id=None):
+def index_embeddings(texts, embeddings, timestamp=None, status=None, incident_likelihood=None, source=None, issue_id=None, category=None, severity=None):
     """Index text with embeddings and metadata"""
     for text, embedding in zip(texts, embeddings):
         doc = {
@@ -220,9 +219,20 @@ def index_embeddings(texts, embeddings, timestamp=None, status=None, incident_li
             doc["incident_likelihood"] = incident_likelihood
         if issue_id:
             doc["issue_id"] = issue_id
+        if category:
+            doc["category"] = category
+        if severity:
+            doc["severity"] = severity
         
+        # OpenSearch Serverless doesn't support refresh=True, so we index without it
+        # AOSS has eventual consistency - documents may take a few seconds to appear
         es.index(index="thala_knowledge", body=doc)
-        logger.info(f"Indexed document: {text[:50]}... [ID: {issue_id}]" if issue_id else f"Indexed document: {text[:50]}...")
+        
+        logger.info(f"[INDEXED] Document: {text[:50]}... [ID: {issue_id}, Status: {status or 'Open'}, Source: {source or 'unknown'}, Category: {category or 'N/A'}, Severity: {severity or 'N/A'}]")
+        
+        # For AOSS, wait longer for eventual consistency (5-10 seconds is more reliable)
+        if SEARCH_BACKEND == 'opensearch_serverless':
+            time.sleep(5)  # Wait 5 seconds for AOSS eventual consistency
 
 # Flask app
 app = Flask(__name__)
@@ -238,21 +248,33 @@ def index():
         incident_likelihood = data.get('incident_likelihood')
         source = data.get('source', 'unknown')
         issue_id = data.get('issue_id')
+        category = data.get('category')
+        severity = data.get('severity')
+        
+        logger.info(f"[INDEX] Received request: issue_id={issue_id}, status={status}, source={source}, category={category}, severity={severity}, text={texts[0][:50] if texts else 'None'}...")
         
         if not texts:
             return jsonify({"error": "No texts provided"}), 400
         
         embeddings = model.encode(texts, convert_to_numpy=True).tolist()
-        index_embeddings(texts, embeddings, timestamp, status, incident_likelihood, source, issue_id)
+        index_embeddings(texts, embeddings, timestamp, status, incident_likelihood, source, issue_id, category, severity)
+        
+        logger.info(f"[INDEX] Successfully indexed: {issue_id or 'unknown'} with status={status}, source={source}")
         
         return jsonify({
             "message": "Indexed successfully",
             "texts": texts,
             "timestamp": timestamp,
-            "status": status
+            "status": status,
+            "issue_id": issue_id,
+            "source": source,
+            "category": category,
+            "severity": severity
         })
     except Exception as e:
         logger.error(f"Error in /index endpoint: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @app.route('/update_status', methods=['POST'])
@@ -409,24 +431,38 @@ def search():
         if not query:
             return jsonify({"error": "No query provided"}), 400
         
-        query_embedding = model.encode([query], convert_to_numpy=True).tolist()[0]
-        
-        # Search for similar documents
-        response = es.search(
-            index="thala_knowledge",
-            body={
-                "size": top_k,
-                "query": {
-                    "script_score": {
-                        "query": {"match_all": {}},
-                        "script": {
-                            "source": "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
-                            "params": {"query_vector": query_embedding}
+        # AOSS doesn't support script_score for cosineSimilarity; use text-based search instead
+        if SEARCH_BACKEND == 'opensearch_serverless':
+            response = es.search(
+                index="thala_knowledge",
+                body={
+                    "size": top_k,
+                    "query": {
+                        "multi_match": {
+                            "query": query,
+                            "fields": ["text^3", "resolution_text", "category", "severity", "source"]
+                        }
+                    },
+                    "sort": [{"timestamp": {"order": "desc"}}]
+                }
+            )
+        else:
+            query_embedding = model.encode([query], convert_to_numpy=True).tolist()[0]
+            response = es.search(
+                index="thala_knowledge",
+                body={
+                    "size": top_k,
+                    "query": {
+                        "script_score": {
+                            "query": {"match_all": {}},
+                            "script": {
+                                "source": "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
+                                "params": {"query_vector": query_embedding}
+                            }
                         }
                     }
                 }
-            }
-        )
+            )
         
         hits = response['hits']['hits']
         results = []

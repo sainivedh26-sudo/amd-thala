@@ -3,32 +3,26 @@ Slack Bot UI with slash commands
 Provides /thala predict, /thala latest_issue, and /thala search commands
 """
 import os
+import json
 import logging
 import requests
 from datetime import datetime
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from dotenv import load_dotenv
-from gemini_predictor import get_predictor
+try:
+    from bedrock_predictor import get_predictor
+except Exception:
+    from gemini_predictor import get_predictor
 from incident_tracker import get_tracker
-from elasticsearch import Elasticsearch
+from search_client import get_search_client
 
 load_dotenv()
 
-# Groq for LLM analysis
-try:
-    from groq import Groq
-    GROQ_AVAILABLE = True
-except ImportError:
-    GROQ_AVAILABLE = False
+BEDROCK_ENABLED = True
 
-# Connect to Elasticsearch
-es = Elasticsearch(
-    hosts=["https://localhost:9200"],
-    ca_certs="D:\\elasticsearch-9.1.5-windows-x86_64\\elasticsearch-9.1.5\\config\\certs\\http_ca.crt",
-    verify_certs=False,
-    basic_auth=("elastic", "NHyNwkjjOmO1GwUBU54_")
-)
+# Connect to search backend (Elasticsearch or OpenSearch)
+es = get_search_client()
 
 # Configure logging
 logging.basicConfig(
@@ -37,9 +31,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Warn about Groq availability after logger is initialized
-if not GROQ_AVAILABLE:
-    logger.warning("Groq not available - Quick Fix LLM analysis will not work")
+if not BEDROCK_ENABLED:
+    logger.warning("Bedrock not enabled - Quick Fix LLM analysis will not work")
 
 # Initialize Slack app
 app = App(token=os.getenv("SLACK_BOT_TOKEN"))
@@ -51,16 +44,16 @@ FLASK_API_URL = os.getenv('FLASK_API_URL', 'http://localhost:5000')
 predictor = get_predictor()
 tracker = get_tracker()
 
-# Initialize Groq client for LLM analysis
-groq_client = None
-if GROQ_AVAILABLE:
-    groq_api_key = os.getenv('GROQ_API_KEY')
-    if groq_api_key:
-        try:
-            groq_client = Groq(api_key=groq_api_key)
-            logger.info("Groq client initialized for Quick Fix analysis")
-        except Exception as e:
-            logger.error(f"Failed to initialize Groq client: {e}")
+bedrock_client = None
+if BEDROCK_ENABLED:
+    try:
+        import boto3
+        from botocore.config import Config
+        region = os.getenv('AWS_REGION', 'us-east-2')
+        bedrock_client = boto3.client('bedrock-runtime', region_name=region, config=Config(retries={"max_attempts":3,"mode":"standard"}))
+        logger.info("Bedrock client initialized for Quick Fix analysis")
+    except Exception as e:
+        logger.error(f"Failed to initialize Bedrock client: {e}")
 
 # AWS Lambda URL for web search
 LAMBDA_URL = os.getenv('AWS_LAMBDA_URL', 'https://oj4j6xjjvv7xlgg5sxzzf7essq0ahhox.lambda-url.us-east-2.on.aws/')
@@ -240,19 +233,98 @@ def handle_latest_issue(respond, page=1, per_page=5):
         # Query Elasticsearch for open incidents with pagination
         from_index = (page - 1) * per_page
         
-        result = es.search(
-            index="thala_knowledge",
-            body={
+        # Build query - use filter with term for keyword fields (more efficient and AOSS-compatible)
+        # REMOVED timestamp filter temporarily to debug - will re-add once we confirm status matching works
+        search_body = {
                 "query": {
-                    "term": {"status": "Open"}
+                "bool": {
+                    "filter": [
+                        {"term": {"status": "Open"}}  # Use term in filter for keyword field
+                        # Temporarily removed timestamp filter to debug
+                        # {"range": {"timestamp": {"gte": "now-7d"}}}
+                    ],
+                    "must_not": [
+                        {"term": {"source": "test"}}
+                    ]
+                }
                 },
                 "sort": [
                     {"timestamp": {"order": "desc"}}
                 ],
-                "size": per_page,
-                "from": from_index
-            }
+            "size": per_page,
+            "from": from_index
+        }
+        
+        logger.info(f"[DEBUG] Querying for open incidents: {json.dumps(search_body, indent=2)}")
+        
+        result = es.search(
+            index="thala_knowledge",
+            body=search_body
         )
+        
+        total_hits = result['hits']['total']['value']
+        logger.info(f"[DEBUG] Query returned {total_hits} total hits")
+        
+        # Debug: Query ALL documents (no filters) to see what's actually indexed
+        debug_body = {
+            "query": {
+                "bool": {
+                    "must_not": [
+                        {"term": {"source": "test"}}
+                    ]
+                }
+            },
+            "size": 20,
+            "sort": [{"timestamp": {"order": "desc"}}]
+        }
+        debug_result = es.search(index="thala_knowledge", body=debug_body)
+        logger.info(f"[DEBUG] ALL documents (last 7d): {debug_result['hits']['total']['value']} total")
+        for hit in debug_result['hits']['hits'][:5]:
+            doc = hit['_source']
+            logger.info(f"[DEBUG] Document: _id={hit['_id']}, issue_id={doc.get('issue_id')}, status={doc.get('status')}, source={doc.get('source')}, timestamp={doc.get('timestamp')}, text={doc.get('text', '')[:40]}...")
+        
+        # Also try to find the document by issue_id if we have a specific ID from the query
+        # This helps debug if the document exists but isn't matching the status query
+        if total_hits == 0 and debug_result['hits']['total']['value'] > 0:
+            logger.warning(f"[DEBUG] Found {debug_result['hits']['total']['value']} total documents but 0 with status=Open. Checking status values...")
+            status_values = set()
+            open_count = 0
+            for hit in debug_result['hits']['hits']:
+                doc = hit['_source']
+                status_val = doc.get('status', 'MISSING')
+                status_values.add(status_val)
+                issue_id = doc.get('issue_id', 'N/A')
+                logger.info(f"[DEBUG] Document {issue_id} has status: '{status_val}' (repr: {repr(status_val)})")
+                if status_val and status_val.strip().lower() == 'open':
+                    open_count += 1
+                    logger.info(f"[DEBUG] ✅ Document {issue_id} IS open (but term query didn't match!)")
+            logger.info(f"[DEBUG] All unique status values found: {status_values}")
+            logger.info(f"[DEBUG] Documents that should match 'Open': {open_count}")
+            
+            # If we found open documents but term query didn't match, try a different query
+            if open_count > 0:
+                logger.warning(f"[DEBUG] Trying alternative query with match instead of term...")
+                alt_query = {
+                    "query": {
+                        "bool": {
+                            "filter": [
+                                {"match": {"status": "Open"}}  # Try match instead of term
+                            ],
+                            "must_not": [
+                                {"term": {"source": "test"}}
+                            ]
+                        }
+                    },
+                    "size": per_page,
+                    "sort": [{"timestamp": {"order": "desc"}}]
+                }
+                alt_result = es.search(index="thala_knowledge", body=alt_query)
+                logger.info(f"[DEBUG] Alternative query (match) returned {alt_result['hits']['total']['value']} hits")
+                if alt_result['hits']['total']['value'] > 0:
+                    # Use the alternative result
+                    result = alt_result
+                    total_hits = alt_result['hits']['total']['value']
+                    logger.info(f"[DEBUG] Using alternative query result!")
         
         total_incidents = result['hits']['total']['value']
         
@@ -264,25 +336,30 @@ def handle_latest_issue(respond, page=1, per_page=5):
             })
             return
         
+        # Debug: Log what we found
+        logger.info(f"[DEBUG] Processing {len(result['hits']['hits'])} hits from search")
+        for hit in result['hits']['hits']:
+            doc = hit['_source']
+            logger.info(f"[DEBUG] Found incident: {hit['_id']} - {doc.get('text', '')[:60]}... status={doc.get('status')} source={doc.get('source')} timestamp={doc.get('timestamp')}")
+        
         # Get all incidents from this page
         incidents_data = []
+        from datetime import datetime
         for hit in result['hits']['hits']:
             doc = hit['_source']
             incident_id = hit['_id']
-        
+
             # Convert to incident format
-            from datetime import datetime
-            timestamp = doc.get('timestamp')
-            if isinstance(timestamp, str):
-                try:
-                    timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-                except:
-                    timestamp = datetime.now()
-            
+        timestamp = doc.get('timestamp')
+        if isinstance(timestamp, str):
+            try:
+                timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            except:
+                timestamp = datetime.now()
+        
             # Use stored category/severity or predict if not available
             category = doc.get('category')
             severity = doc.get('severity')
-            
             if not category or not severity:
                 try:
                     prediction = predictor.predict(doc.get('text', ''))
@@ -292,13 +369,13 @@ def handle_latest_issue(respond, page=1, per_page=5):
                     logger.error(f"Error predicting for {incident_id}: {e}")
                     category = category or 'Unknown'
                     severity = severity or 'Unknown'
-            
+
             incidents_data.append({
-                'id': incident_id,
-                'text': doc.get('text', ''),
-                'source': doc.get('source', 'unknown').upper(),
-                'timestamp': timestamp,
-                'status': doc.get('status', 'Open'),
+            'id': incident_id,
+            'text': doc.get('text', ''),
+            'source': doc.get('source', 'unknown').upper(),
+            'timestamp': timestamp,
+            'status': doc.get('status', 'Open'),
                 'category': category,
                 'severity': severity,
                 'discussions': doc.get('discussions', [])
@@ -321,29 +398,44 @@ def handle_latest_issue(respond, page=1, per_page=5):
             }
         ]
         
-        # Add each incident
-        for idx, incident in enumerate(incidents_data, start=from_index + 1):
-            # Format timestamp
+        # Add each incident (use page-relative numbering, not global index)
+        for idx, incident in enumerate(incidents_data, start=1):
+        # Format timestamp
             timestamp_str = incident['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
-            
-            # Determine severity emoji
-            severity_emoji = '⚪'
-            if incident.get('severity'):
-                severity_emoji = {
-                    'Critical': '🔴',
-                    'High': '🟠',
-                    'Medium': '🟡',
-                    'Low': '🟢'
-                }.get(incident['severity'], '⚪')
-            
+        
+        # Determine severity emoji
+        severity_emoji = '⚪'
+        if incident.get('severity'):
+            severity_emoji = {
+                'Critical': '🔴',
+                'High': '🟠',
+                'Medium': '🟡',
+                'Low': '🟢'
+            }.get(incident['severity'], '⚪')
+        
             # Get discussion count
             discussion_count = len(incident.get('discussions', []))
-            
-            # Truncate text for display
-            incident_text = incident['text'][:300]
-            if len(incident['text']) > 300:
-                incident_text += "..."
-            
+
+            # Clean and truncate text for display
+            import re
+            raw_text = incident.get('text', '') or ''
+            cleaned = raw_text
+            source_prefixes = ['Slack:', 'Jira:', 'Email:', 'SLACK:', 'JIRA:', 'EMAIL:']
+            for p in source_prefixes:
+                if cleaned.startswith(p):
+                    cleaned = cleaned[len(p):].strip()
+                    break
+            for p in source_prefixes:
+                cleaned = cleaned.replace(f"{p} ", "").replace(f"{p}", "")
+            cleaned = re.sub(r"\[Attachment:.*?\]", "", cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(r"\[File:.*?\]", "", cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(r"\[User:.*?\]", "", cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(r"\[.*?Time:.*?\]", "", cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(r"\s+", " ", cleaned).strip()
+            incident_text = f"{incident['source'].title()}: {cleaned}" if cleaned else incident['source'].title()
+            if len(incident_text) > 300:
+                incident_text = incident_text[:300] + "..."
+
             # Incident header
             blocks.append({
                 "type": "section",
@@ -352,59 +444,38 @@ def handle_latest_issue(respond, page=1, per_page=5):
                     "text": f"*#{idx}. {incident_text}*"
                 }
             })
-            
+
             # Incident details
             fields = [
-                {
-                    "type": "mrkdwn",
-                    "text": f"*🆔 ID*\n`{incident['id']}`"
-                },
-                {
-                    "type": "mrkdwn",
-                    "text": f"*📍 Source*\n`{incident['source']}`"
-                },
-                {
-                    "type": "mrkdwn",
-                    "text": f"*📁 Category*\n`{incident.get('category', 'Unknown')}`"
-                },
-                {
-                    "type": "mrkdwn",
-                    "text": f"*{severity_emoji} Severity*\n`{incident.get('severity', 'Unknown')}`"
-                }
+                {"type": "mrkdwn", "text": f"*🆔 ID*\n`{incident['id']}`"},
+                {"type": "mrkdwn", "text": f"*📍 Source*\n`{incident['source']}`"},
+                {"type": "mrkdwn", "text": f"*📁 Category*\n`{incident.get('category', 'Unknown')}`"},
+                {"type": "mrkdwn", "text": f"*{severity_emoji} Severity*\n`{incident.get('severity', 'Unknown')}`"}
             ]
-            
-            blocks.append({
-                "type": "section",
-                "fields": fields
-            })
-            
+
+            blocks.append({"type": "section", "fields": fields})
+
             blocks.append({
                 "type": "context",
                 "elements": [
-                    {
-                        "type": "mrkdwn",
-                        "text": f"🕐 Started: `{timestamp_str}` | 💬 {discussion_count} discussion(s) | 🔄 Status: *{incident['status']}*"
-                    }
+                    {"type": "mrkdwn", "text": f"🕐 Started: `{timestamp_str}` | 💬 {discussion_count} discussion(s) | 🔄 Status: *{incident['status']}*"}
                 ]
             })
-            
+
             # Add Quick Fix button for each incident
             blocks.append({
                 "type": "actions",
                 "elements": [
                     {
                         "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "🔧 Quick Fix"
-                        },
+                        "text": {"type": "plain_text", "text": "🔧 Quick Fix"},
                         "style": "primary",
                         "value": f"quick_fix_{incident['id']}",
                         "action_id": "show_quick_fix_options"
                     }
                 ]
             })
-            
+
             # Add divider between incidents (except last)
             if idx < from_index + len(incidents_data):
                 blocks.append({"type": "divider"})
@@ -444,8 +515,8 @@ def handle_latest_issue(respond, page=1, per_page=5):
         blocks.append({
             "type": "context",
             "elements": [
-                {
-                    "type": "mrkdwn",
+            {
+                "type": "mrkdwn",
                     "text": f"Showing {from_index + 1}-{min(from_index + per_page, total_incidents)} of {total_incidents} ongoing incidents"
                 }
             ]
@@ -551,27 +622,24 @@ def handle_search(respond, parts):
         # Group by status: Resolved first, then Open
         resolved_incidents = [inc for inc in incidents if inc.get('status') == 'Resolved']
         open_incidents = [inc for inc in incidents if inc.get('status') == 'Open']
-        
+
         # Show resolved incidents first (these are prioritized by Flask endpoint)
         if resolved_incidents:
             blocks.append({
                 "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"*✅ Resolved Incidents ({len(resolved_incidents)} found)*"
-                }
+                "text": {"type": "mrkdwn", "text": f"*✅ Resolved Incidents ({len(resolved_incidents)} found)*"}
             })
-            
-            for i, incident in enumerate(resolved_incidents[:5], 1):  # Show max 5 resolved
+
+            for i, incident in enumerate(resolved_incidents[:5], 1):
                 text = incident.get('text', 'N/A')
-                score = incident.get('score', 0)
+                score = incident.get('score') or 0.0
                 timestamp = incident.get('timestamp', '')
                 resolution_text = incident.get('resolution_text', '')
                 resolved_by = incident.get('resolved_by', 'Unknown')
                 resolved_at = incident.get('resolved_at', '')
                 issue_id = incident.get('issue_id', 'N/A')
-                
-                # Format timestamp
+
+                # Format timestamps
                 time_str = ""
                 if timestamp:
                     try:
@@ -579,8 +647,7 @@ def handle_search(respond, parts):
                         time_str = dt.strftime("%Y-%m-%d %H:%M")
                     except:
                         time_str = timestamp[:16] if len(timestamp) > 16 else timestamp
-                
-                # Format resolved_at
+
                 resolved_time_str = ""
                 if resolved_at:
                     try:
@@ -588,78 +655,44 @@ def handle_search(respond, parts):
                         resolved_time_str = dt.strftime("%Y-%m-%d %H:%M")
                     except:
                         resolved_time_str = resolved_at[:16] if len(resolved_at) > 16 else resolved_at
-                
+
                 incident_text = f"*#{i}* {text[:100]}..." if len(text) > 100 else f"*#{i}* {text}"
-                
+
                 fields = [
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*Incident:*\n{incident_text}"
-                    }
+                    {"type": "mrkdwn", "text": f"*Incident:*\n{incident_text}"}
                 ]
-                
                 if resolution_text:
                     resolution_display = resolution_text[:150] + "..." if len(resolution_text) > 150 else resolution_text
-                    fields.append({
-                        "type": "mrkdwn",
-                        "text": f"*Resolution:*\n{resolution_display}"
-                    })
-                
-                if resolved_by != 'Unknown' and resolved_by:
-                    fields.append({
-                        "type": "mrkdwn",
-                        "text": f"*Resolved by:* {resolved_by}"
-                    })
-                
+                    fields.append({"type": "mrkdwn", "text": f"*Resolution:*\n{resolution_display}"})
+                if resolved_by and resolved_by != 'Unknown':
+                    fields.append({"type": "mrkdwn", "text": f"*Resolved by:* {resolved_by}"})
                 if resolved_time_str:
-                    fields.append({
-                        "type": "mrkdwn",
-                        "text": f"*Resolved at:* {resolved_time_str}"
-                    })
-                
-                blocks.append({
-                    "type": "section",
-                    "fields": fields
-                })
-                
-                # Add context with ID and similarity score
-                context_elements = [
-                    {
-                        "type": "mrkdwn",
-                        "text": f"ID: `{issue_id}` | Similarity: `{score:.2f}`"
-                    }
-                ]
+                    fields.append({"type": "mrkdwn", "text": f"*Resolved at:* {resolved_time_str}"})
+
+                blocks.append({"type": "section", "fields": fields})
+
+                context_elements = [{"type": "mrkdwn", "text": f"ID: `{issue_id}` | Similarity: `{float(score):.2f}`"}]
                 if time_str:
-                    context_elements.append({
-                        "type": "mrkdwn",
-                        "text": f"Original: {time_str}"
-                    })
-                
-                blocks.append({
-                    "type": "context",
-                    "elements": context_elements
-                })
-                
+                    context_elements.append({"type": "mrkdwn", "text": f"Original: {time_str}"})
+                blocks.append({"type": "context", "elements": context_elements})
+
                 if i < len(resolved_incidents[:5]):
                     blocks.append({"type": "divider"})
-        
+
         # Show open incidents if any
         if open_incidents:
             blocks.append({"type": "divider"})
             blocks.append({
                 "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"*🔄 Open Incidents ({len(open_incidents)} found)*"
-                }
+                "text": {"type": "mrkdwn", "text": f"*🔄 Open Incidents ({len(open_incidents)} found)*"}
             })
-            
-            for i, incident in enumerate(open_incidents[:3], 1):  # Show max 3 open
+
+            for i, incident in enumerate(open_incidents[:3], 1):
                 text = incident.get('text', 'N/A')
-                score = incident.get('score', 0)
+                score = incident.get('score') or 0.0
                 timestamp = incident.get('timestamp', '')
                 issue_id = incident.get('issue_id', 'N/A')
-                
+
                 time_str = ""
                 if timestamp:
                     try:
@@ -667,28 +700,20 @@ def handle_search(respond, parts):
                         time_str = dt.strftime("%Y-%m-%d %H:%M")
                     except:
                         time_str = timestamp[:16] if len(timestamp) > 16 else timestamp
-                
+
                 incident_text = f"{text[:100]}..." if len(text) > 100 else text
-                
+
                 blocks.append({
                     "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"*#{i}* {incident_text}\nID: `{issue_id}` | Similarity: `{score:.2f}` | Started: {time_str}"
-                    }
+                    "text": {"type": "mrkdwn", "text": f"*#{i}* {incident_text}\nID: `{issue_id}` | Similarity: `{float(score):.2f}` | Started: {time_str}"}
                 })
-                
+
                 if i < len(open_incidents[:3]):
                     blocks.append({"type": "divider"})
-        
+
         blocks.append({
             "type": "context",
-            "elements": [
-                {
-                    "type": "mrkdwn",
-                    "text": f"🔍 Found {len(incidents)} total similar incidents | Powered by semantic similarity search"
-                }
-            ]
+            "elements": [{"type": "mrkdwn", "text": f"🔍 Found {len(incidents)} total similar incidents | Powered by semantic similarity search"}]
         })
         
         respond({
@@ -1023,8 +1048,8 @@ def analyze_with_llm(incident_text, context_data, toolkit_name):
     Returns:
         str: LLM-generated fix suggestions
     """
-    if not groq_client:
-        return "❌ LLM analysis not available (Groq not configured)"
+    if not bedrock_client:
+        return "❌ LLM analysis not available (Bedrock not configured)"
     
     try:
         # Clean incident text - remove source prefixes like "Slack: ", "Jira: ", "Email: "
@@ -1179,41 +1204,22 @@ Based on the current incident, past resolutions, and web resources, provide:
 Format your response in clear sections with numbered steps. Be specific and actionable.
 """
         
-        # Call Groq API
-        response = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+        # Call Bedrock API
+        bedrock_model = os.getenv('BEDROCK_LLAMA_MODEL_ID', 'us.meta.llama3-3-70b-instruct-v1:0')  # Use inference profile ID with 'us.' prefix
+        resp = bedrock_client.converse(
+            modelId=bedrock_model,
+            system=[{"text": "You are an expert IT incident resolver. Provide clear, actionable fix suggestions based on incident data and context. IMPORTANT: Focus on the actual technical issue (infrastructure, services, applications, databases, APIs), NOT on communication platforms (Slack, Jira, Email) which are just message sources."}],
             messages=[
-                {
-                    "role": "system",
-                    "content": "You are an expert IT incident resolver. Provide clear, actionable fix suggestions based on incident data and context. IMPORTANT: Focus on the actual technical issue (infrastructure, services, applications, databases, APIs), NOT on communication platforms (Slack, Jira, Email) which are just message sources. If an incident mentions 'Slack:' or 'Jira:' prefix, ignore that and analyze the real technical problem described."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
+                {"role": "user", "content": [{"text": prompt}]}
             ],
-            temperature=0.3,
-            max_tokens=1500
+            inferenceConfig={"temperature": 0.3, "maxTokens": 1500, "topP": 0.9}
         )
-        
-        # Validate response structure
-        if not response:
-            raise ValueError("Groq API returned None response")
-        
-        if not hasattr(response, 'choices') or not response.choices:
-            raise ValueError("Groq API response has no choices")
-        
-        if not response.choices[0] or not hasattr(response.choices[0], 'message'):
-            raise ValueError("Groq API response choice has no message")
-        
-        if not response.choices[0].message or not hasattr(response.choices[0].message, 'content'):
-            raise ValueError("Groq API response message has no content")
-        
-        analysis = response.choices[0].message.content
+        content = resp['output']['message']['content']
+        parts = [c.get('text') for c in content if 'text' in c]
+        analysis = ("\n".join([p for p in parts if p]) or '').strip()
         if not analysis:
-            raise ValueError("Groq API returned empty content")
-        
-        return analysis.strip()
+            raise ValueError("Bedrock returned empty content")
+        return analysis
         
     except Exception as e:
         logger.error(f"Error in LLM analysis: {e}", exc_info=True)
