@@ -33,6 +33,18 @@
   <a href="#api-endpoints">API Endpoints</a>
 </p>
 
+<br>
+
+<div align="center">
+  <h3>For Any Support</h3>
+  <a href="https://discord.gg/M6m9Pn6spK">
+    <img src="https://img.shields.io/badge/Join%20Us%20On-Discord-5865F2?logo=discord&logoColor=white" alt="Join us on Discord" height="28">
+  </a>
+</div>
+
+
+
+
 
 <br>
 <br>
