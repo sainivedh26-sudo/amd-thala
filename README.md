@@ -395,3 +395,5 @@ Find incident by ID
 ### If you like this, then
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/sai_nivedh_26)
 
+### Still have some doubts ?
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/SaiNivedh26/team-thala)
