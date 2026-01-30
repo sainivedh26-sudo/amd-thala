@@ -49,10 +49,19 @@
 <br>
 <br>
 
-<h2>Ready to check the demo ?</h2>
+<h2>Want to try hands on ?</h2>
+
+[![Agnent Thala Prototype Launch](https://github.com/user-attachments/assets/e449d585-6156-4b3b-8867-81849678defd)](https://try-thala-psi.vercel.app/)
+
+
+
+<br>
 <br>
 
-[![Agnent Thala Prototype Launch](https://github.com/user-attachments/assets/3efb52f1-96f9-4f73-8e20-4643aafeb749)](https://www.youtube.com/watch?v=pK1OFuGYdEE)
+<h2>Ready to check the end to end demo ?</h2>
+<br>
+
+[![Agnent Thala Prototype Launch](https://github.com/user-attachments/assets/c0d97319-7487-4c47-b27e-91f7b7029eef)](https://www.youtube.com/watch?v=pK1OFuGYdEE)
 
 
 
