@@ -63,7 +63,11 @@
 
 [![Agnent Thala Prototype Launch](https://github.com/user-attachments/assets/c0d97319-7487-4c47-b27e-91f7b7029eef)](https://www.youtube.com/watch?v=pK1OFuGYdEE)
 
+<br>
+<br>
+<img width="666" height="375" alt="Copy_of_mohan-review__4_-removebg-preview" src="https://github.com/user-attachments/assets/a8dfa2d8-531b-4508-883a-01f701e21063" />
 
+[![mohan-review (1)](https://github.com/user-attachments/assets/74ca985c-9b7f-4c74-9822-ca0057aabb45)](https://www.linkedin.com/in/mohan~v/)
 
 ## About The Project
 
