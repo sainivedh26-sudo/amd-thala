@@ -49,7 +49,9 @@
 <br>
 <br>
 
-<h2>Want to try hands on ?</h2>
+<!-- <h2>Want to try hands on ?</h2> -->
+
+<img width="666" height="375" alt="Copy_of_mohan-review__5___1_-removebg-preview" src="https://github.com/user-attachments/assets/dc2e9235-6f10-480f-9764-ca6884571c0c" />
 
 [![Agnent Thala Prototype Launch](https://github.com/user-attachments/assets/e449d585-6156-4b3b-8867-81849678defd)](https://try-thala-psi.vercel.app/)
 
@@ -58,16 +60,23 @@
 <br>
 <br>
 
-<h2>Ready to check the end to end demo ?</h2>
+<!-- <h2>Ready to check the end to end demo ?</h2> -->
+<img width="666" height="375" alt="Copy_of_mohan-review__6___1_-removebg-preview" src="https://github.com/user-attachments/assets/cec1f8d7-3652-427d-ac0a-294d3e1f293d" />
+
 <br>
 
 [![Agnent Thala Prototype Launch](https://github.com/user-attachments/assets/c0d97319-7487-4c47-b27e-91f7b7029eef)](https://www.youtube.com/watch?v=pK1OFuGYdEE)
 
 <br>
 <br>
-<img width="666" height="375" alt="Copy_of_mohan-review__4_-removebg-preview" src="https://github.com/user-attachments/assets/a8dfa2d8-531b-4508-883a-01f701e21063" />
+<img width="693" height="360" alt="Copy_of_mohan-review__4___1_-removebg-preview" src="https://github.com/user-attachments/assets/748d29fe-29ad-4554-bfe9-831e1956aa4b" />
 
 [![mohan-review (1)](https://github.com/user-attachments/assets/74ca985c-9b7f-4c74-9822-ca0057aabb45)](https://www.linkedin.com/in/mohan~v/)
+
+<br>
+<br>
+
+--------------------------------------------------------------------------------
 
 ## About The Project
 
