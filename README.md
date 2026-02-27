@@ -14,6 +14,21 @@
 
 <!-- LOGO -->
 <!-- LOGO -->
+
+<!-- <img width="455" height="549" alt="Gemini_Generated_Image_rahzs0rahzs0rahz-removebg-preview" src="https://github.com/user-attachments/assets/9ed75804-094a-4626-95e1-6c0dd28eb34a" /> -->
+
+<p align="center">
+  <a href="https://youtu.be/Uw5dVqHBSAs?si=99UPnVoGxeMgcwxF&t=1970" target="_blank">
+    <img width="455" height="549" alt="SuperHack 2025 Winner Badge" src="https://github.com/user-attachments/assets/9ed75804-094a-4626-95e1-6c0dd28eb34a" />
+  </a>
+</p>
+
+
+
+
+<br>
+<br>
+
 <br />
 <h1 align="center">
   <font size="7">THALA</font>
