@@ -17,17 +17,7 @@
 
 <!-- <img width="455" height="549" alt="Gemini_Generated_Image_rahzs0rahzs0rahz-removebg-preview" src="https://github.com/user-attachments/assets/9ed75804-094a-4626-95e1-6c0dd28eb34a" /> -->
 
-<p align="center">
-  <a href="https://youtu.be/Uw5dVqHBSAs?si=99UPnVoGxeMgcwxF&t=1970" target="_blank">
-    <img width="455" height="549" alt="SuperHack 2025 Winner Badge" src="https://github.com/user-attachments/assets/9ed75804-094a-4626-95e1-6c0dd28eb34a" />
-  </a>
-</p>
 
-
-
-
-<br>
-<br>
 
 <br />
 <h1 align="center">
@@ -80,7 +70,7 @@
 
 <br>
 
-[![Agnent Thala Prototype Launch](https://github.com/user-attachments/assets/c0d97319-7487-4c47-b27e-91f7b7029eef)](https://www.youtube.com/watch?v=pK1OFuGYdEE)
+[![Agnent Thala Prototype Launch](https://github.com/user-attachments/assets/c0d97319-7487-4c47-b27e-91f7b7029eef)](https://www.youtube.com/watch?v=jRku_-XwHC0)
 
 <br>
 <br>
@@ -438,14 +428,8 @@ Find incident by ID
 
 ## Developers
 
-[Sai Nivedh](https://www.github.com/SaiNivedh26)
+Sai Nivedh
+Kavinesh
+Hygrevan
 
-[Kishore Balaji](https://www.github.com/Kishore-1803)
 
-<br>
-
-### If you like this, then
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/sai_nivedh_26)
-
-### Still have some doubts ?
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/SaiNivedh26/team-thala)
