@@ -54,6 +54,10 @@
 <br>
 <br>
 
+<img width="883" height="319" alt="image" src="https://github.com/user-attachments/assets/707c2e24-c6cc-4b02-a532-405258bd5b2d" />
+
+<br>
+<br>
 <!-- <h2>Want to try hands on ?</h2> -->
 
 <img width="666" height="375" alt="Copy_of_mohan-review__5___1_-removebg-preview" src="https://github.com/user-attachments/assets/dc2e9235-6f10-480f-9764-ca6884571c0c" />
@@ -426,10 +430,13 @@ Find incident by ID
 - Uses conversational context (recent incidents)
 - Fallback to most recent open incident if no match
 
-## Developers
 
-Sai Nivedh
-Kavinesh
-Hygrevan
+------
+
+![Material wave loading](https://github.com/user-attachments/assets/a08255eb-9647-471d-9881-61871332249f)
+
+
+
+### Developed with ❤️ by [Sai Nivedh](https://github.com/SaiNIvedh26) , [Hari Heman](https://github.com/kavinesh11) and [Hygrevan](https://github.com/Hygrevan-343)
 
 
