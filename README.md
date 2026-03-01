@@ -437,6 +437,6 @@ Find incident by ID
 
 
 
-### Developed with ❤️ by [Sai Nivedh](https://github.com/SaiNIvedh26) , [Hari Heman](https://github.com/kavinesh11) and [Hygrevan](https://github.com/Hygrevan-343)
+### Developed with ❤️ by [Sai Nivedh](https://github.com/SaiNIvedh26) , [Kavinesh](https://github.com/kavinesh11) and [Hygrevan](https://github.com/Hygrevan-343)
 
 
